@@ -19,6 +19,51 @@
     <div id="tab-content" class="space-y-6"></div>
   </main>
 
+  <!-- Modal: Authentication (Login / Register) -->
+  <div id="modal-auth" class="fixed inset-0 bg-slate-900/65 backdrop-blur-md items-center justify-center p-4 z-50 flex hidden">
+    <div class="bg-white/95 rounded-2xl shadow-2xl max-w-sm w-full border border-slate-200/50 p-6 space-y-5 overflow-hidden transition-all transform scale-100">
+      <!-- Title & Tabs -->
+      <div class="space-y-1 text-center">
+        <h3 id="auth-title" class="text-lg font-extrabold tracking-tight text-slate-900">Sign In</h3>
+        <p id="auth-subtitle" class="text-xs text-slate-500">Access your Project Tracker board</p>
+      </div>
+
+      <!-- Tab Selectors -->
+      <div class="flex bg-slate-100 rounded-lg p-1 border border-slate-200">
+        <button id="tab-btn-login" type="button" class="flex-1 text-xs font-bold py-1.5 rounded-md bg-white text-slate-900 shadow-sm transition-all focus:outline-none">Log In</button>
+        <button id="tab-btn-register" type="button" class="flex-1 text-xs font-bold py-1.5 rounded-md text-slate-500 hover:text-slate-900 transition-all focus:outline-none">Sign Up</button>
+      </div>
+
+      <!-- Error message container -->
+      <div id="auth-error" class="hidden bg-rose-50 border border-rose-200 text-rose-700 text-xs px-3 py-2 rounded-lg font-medium"></div>
+
+      <!-- Combined Form -->
+      <form id="form-auth" class="space-y-4">
+        <!-- Email field (only visible for Register) -->
+        <div id="auth-email-group" class="space-y-1.5 hidden">
+          <label class="text-[11px] font-bold text-slate-600 uppercase tracking-wider block">Email Address</label>
+          <input id="auth-email" type="email" placeholder="you@example.com"
+            class="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-[#3BBDE5]/20 focus:border-[#3BBDE5]" />
+        </div>
+
+        <div class="space-y-1.5">
+          <label class="text-[11px] font-bold text-slate-600 uppercase tracking-wider block">Username</label>
+          <input id="auth-username" type="text" placeholder="e.g. johndoe" required
+            class="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-[#3BBDE5]/20 focus:border-[#3BBDE5]" />
+        </div>
+
+        <div class="space-y-1.5">
+          <label class="text-[11px] font-bold text-slate-600 uppercase tracking-wider block">Password</label>
+          <input id="auth-password" type="password" placeholder="••••••••" required
+            class="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-[#3BBDE5]/20 focus:border-[#3BBDE5]" />
+        </div>
+
+        <button type="submit" id="btn-auth-submit"
+          class="w-full py-2.5 text-xs font-extrabold text-white bg-[#2E7D9B] hover:bg-[#3BBDE5] rounded-lg shadow-md transition-all">Sign In</button>
+      </form>
+    </div>
+  </div>
+
   <!-- Modal: Create Project -->
   <div id="modal-project" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm items-center justify-center p-4 z-50">
     <div class="bg-white rounded-xl shadow-xl max-w-md w-full border border-slate-100 p-6 space-y-4">
