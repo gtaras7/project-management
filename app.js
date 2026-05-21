@@ -63,8 +63,9 @@ async function apiDeleteTask(id) {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function getDaysDiff(deadlineStr) {
   const today = new Date(); today.setHours(0,0,0,0);
-  const d     = new Date(deadlineStr); d.setHours(0,0,0,0);
-  return Math.ceil((d - today) / 86400000);
+  const [y, m, d] = deadlineStr.split('-').map(Number);
+  const due = new Date(y, m - 1, d); // local midnight — avoids UTC-shift on ISO strings
+  return Math.ceil((due - today) / 86400000);
 }
 
 function getOverdueCount() {
@@ -87,6 +88,13 @@ function deadlineAlert(deadline) {
   if (diff === 0) return `<span class="flex items-center gap-1.5 text-rose-600 bg-rose-50 border border-rose-100 rounded-md px-1.5 py-0.5 font-semibold text-[10px]">📅 Due Today</span>`;
   if (diff === 1) return `<span class="flex items-center gap-1.5 text-amber-600 bg-amber-50 border border-amber-100 rounded-md px-1.5 py-0.5 font-semibold text-[10px]">📅 Due Tomorrow</span>`;
   return `<span class="flex items-center gap-1.5 text-slate-500 bg-slate-50 border border-slate-200/50 rounded-md px-1.5 py-0.5 text-[10px]">📅 ${diff} days left (${deadline})</span>`;
+}
+
+// ─── HTML escape helper (prevents XSS from user-supplied content) ──────────
+function esc(str) {
+  const d = document.createElement('div');
+  d.textContent = str ?? '';
+  return d.innerHTML;
 }
 
 // ─── Render: Header ───────────────────────────────────────────────────────────
@@ -169,26 +177,26 @@ function renderKanbanBoard() {
 
   const activeProj = state.projects.find(p => p.id === state.activeProjectId);
   const projDesc = (state.activeProjectId !== 'all' && activeProj)
-    ? `<div class="mt-4 pt-4 border-t border-slate-100 text-slate-600 leading-relaxed text-xs">${activeProj.description || ''}</div>` : '';
+    ? `<div class="mt-4 pt-4 border-t border-slate-100 text-slate-600 leading-relaxed text-xs">${esc(activeProj.description || '')}</div>` : '';
 
   const projTabs = [
     `<button data-projid="all" class="px-3 py-1.5 text-xs font-semibold rounded-lg text-nowrap transition-all ${state.activeProjectId==='all'?'bg-slate-900 text-white shadow':'text-slate-600 hover:bg-slate-50'}">All Projects</button>`,
-    ...state.projects.map(p => `<button data-projid="${p.id}" class="px-3 py-1.5 text-xs font-semibold rounded-lg text-nowrap transition-all ${state.activeProjectId===p.id?'bg-indigo-600 text-white shadow':'text-slate-600 hover:bg-slate-50'}">${p.name}</button>`),
+    ...state.projects.map(p => `<button data-projid="${p.id}" class="px-3 py-1.5 text-xs font-semibold rounded-lg text-nowrap transition-all ${state.activeProjectId===p.id?'bg-indigo-600 text-white shadow':'text-slate-600 hover:bg-slate-50'}">${esc(p.name)}</button>`),
     `<button id="btn-new-project" class="px-2.5 py-1.5 text-xs font-semibold border border-dashed border-slate-300 rounded-lg text-indigo-600 hover:bg-indigo-50 flex items-center gap-1 shrink-0">+ New Project</button>`,
   ].join('');
 
   const cardHtml = (task) => {
     const proj = state.projects.find(p => p.id === task.project_id);
     const projTag = (proj && state.activeProjectId === 'all')
-      ? `<span class="bg-indigo-50 text-indigo-600 text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wide">${proj.name}</span>` : '';
+      ? `<span class="bg-indigo-50 text-indigo-600 text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wide">${esc(proj.name)}</span>` : '';
     const idx = statuses.indexOf(task.status);
     const ml = idx > 0 ? `<button data-action="move" data-id="${task.id}" data-target="${statuses[idx-1]}" class="p-1 border border-slate-200 rounded text-slate-500 hover:text-indigo-600 hover:bg-slate-50 transition-colors" title="Move back">←</button>` : '';
     const mr = idx < 3 ? `<button data-action="move" data-id="${task.id}" data-target="${statuses[idx+1]}" class="p-1 border border-slate-200 rounded text-slate-500 hover:text-indigo-600 hover:bg-slate-50 transition-colors" title="Move forward">→</button>` : '';
     return `
       <div class="bg-white border border-slate-150 rounded-lg p-3 hover:shadow-md transition-all space-y-2 relative group">
         <div class="flex justify-between items-start gap-1">${projTag}<div class="flex gap-1 items-center ml-auto">${priorityBadge(task.priority)}</div></div>
-        <h4 class="text-xs font-bold text-slate-900 leading-snug break-words">${task.title}</h4>
-        ${task.description ? `<p class="text-[11px] text-slate-500 leading-relaxed line-clamp-3 break-words">${task.description}</p>` : ''}
+        <h4 class="text-xs font-bold text-slate-900 leading-snug break-words">${esc(task.title)}</h4>
+        ${task.description ? `<p class="text-[11px] text-slate-500 leading-relaxed line-clamp-3 break-words">${esc(task.description)}</p>` : ''}
         <div class="flex flex-wrap gap-2 pt-2 border-t border-slate-50 items-center justify-between">
           ${deadlineAlert(task.deadline)}
           <div class="flex gap-1.5">${ml}${mr}
@@ -221,7 +229,7 @@ function renderKanbanBoard() {
           <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
             <div class="relative">
               <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none">🔍</span>
-              <input id="search-input" type="text" placeholder="Search board tasks..." value="${state.searchQuery}"
+              <input id="search-input" type="text" placeholder="Search board tasks..." value="${esc(state.searchQuery)}"
                 class="pl-8 pr-4 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg text-xs outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all w-full sm:w-48 text-slate-800" />
             </div>
             <div class="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1">
@@ -296,10 +304,10 @@ function renderDeadlines() {
         <div class="space-y-1">
           <div class="flex items-center gap-2">
             <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded border ${badgeCls}">${cdText(task)}</span>
-            ${proj ? `<span class="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">${proj.name}</span>` : ''}
+            ${proj ? `<span class="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">${esc(proj.name)}</span>` : ''}
           </div>
-          <h4 class="text-xs font-bold text-slate-800">${task.title}</h4>
-          ${task.description ? `<p class="text-[11px] text-slate-500 line-clamp-1">${task.description}</p>` : ''}
+          <h4 class="text-xs font-bold text-slate-800">${esc(task.title)}</h4>
+          ${task.description ? `<p class="text-[11px] text-slate-500 line-clamp-1">${esc(task.description)}</p>` : ''}
         </div>
         <div class="flex items-center gap-3 shrink-0">
           <span class="text-xs font-mono font-medium text-slate-600 bg-white border border-slate-200 shadow-sm px-2.5 py-1 rounded-lg">📅 ${task.deadline}</span>
@@ -346,13 +354,17 @@ function closeProjectModal() {
   m.classList.add('hidden'); m.classList.remove('flex');
 }
 function openTaskModal() {
+  if (!state.projects.length) {
+    alert('Please create a project first before adding tasks.');
+    return;
+  }
   document.getElementById('task-title').value   = '';
   document.getElementById('task-desc').value    = '';
   document.getElementById('task-deadline').value = '';
   document.getElementById('task-title-error').classList.add('hidden');
   const sel = document.getElementById('task-project');
   sel.innerHTML = state.projects.map(p =>
-    `<option value="${p.id}" ${(state.activeProjectId !== 'all' && state.activeProjectId === p.id) ? 'selected':''}>${p.name}</option>`
+    `<option value="${p.id}" ${(state.activeProjectId !== 'all' && state.activeProjectId === p.id) ? 'selected':''}>${esc(p.name)}</option>`
   ).join('');
   document.getElementById('task-priority').value = 'low';
   document.getElementById('task-status').value   = 'todo';
