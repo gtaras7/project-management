@@ -151,8 +151,7 @@ function renderHeader() {
           </svg>
         </div>
         <div>
-          <span class="font-mono text-[9px] uppercase font-bold tracking-widest text-indigo-400 bg-indigo-500/15 border border-indigo-500/25 px-1.5 py-0.5 rounded">PHP 8.2+ with PDO MySQL</span>
-          <h1 class="text-base font-extrabold tracking-tight mt-0.5 text-white">DevBoard Project Tracker</h1>
+          <h1 class="text-base font-extrabold tracking-tight text-white">Project Tracker</h1>
         </div>
       </div>
       <div class="flex flex-wrap items-center gap-3">
