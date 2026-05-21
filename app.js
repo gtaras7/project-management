@@ -8,7 +8,7 @@ const state = {
   priorityFilter:  'all',     // 'all' | 'low' | 'medium' | 'high'
 };
 
-const API = 'api.php';
+const API = 'data_handler.php';
 
 // ─── API wrappers ─────────────────────────────────────────────────────────────
 async function apiFetch(action, body = null) {
