@@ -84,10 +84,13 @@ function priorityBadge(p) {
 function deadlineAlert(deadline) {
   if (!deadline) return '';
   const diff = getDaysDiff(deadline);
-  if (diff < 0)   return `<span class="flex items-center gap-1.5 text-rose-600 bg-rose-50 border border-rose-100 rounded-md px-1.5 py-0.5 font-semibold text-[10px]">⚠ Overdue by ${Math.abs(diff)}d</span>`;
-  if (diff === 0) return `<span class="flex items-center gap-1.5 text-rose-600 bg-rose-50 border border-rose-100 rounded-md px-1.5 py-0.5 font-semibold text-[10px]">📅 Due Today</span>`;
-  if (diff === 1) return `<span class="flex items-center gap-1.5 text-amber-600 bg-amber-50 border border-amber-100 rounded-md px-1.5 py-0.5 font-semibold text-[10px]">📅 Due Tomorrow</span>`;
-  return `<span class="flex items-center gap-1.5 text-slate-500 bg-slate-50 border border-slate-200/50 rounded-md px-1.5 py-0.5 text-[10px]">📅 ${diff} days left (${deadline})</span>`;
+  const warningSvg = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>`;
+  const calendarSvg = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" /></svg>`;
+
+  if (diff < 0)   return `<span class="flex items-center gap-1 text-rose-600 bg-rose-50 border border-rose-100 rounded-md px-1.5 py-0.5 font-semibold text-[10px]">${warningSvg} Overdue by ${Math.abs(diff)}d</span>`;
+  if (diff === 0) return `<span class="flex items-center gap-1 text-rose-600 bg-rose-50 border border-rose-100 rounded-md px-1.5 py-0.5 font-semibold text-[10px]">${warningSvg} Due Today</span>`;
+  if (diff === 1) return `<span class="flex items-center gap-1 text-amber-600 bg-amber-50 border border-amber-100 rounded-md px-1.5 py-0.5 font-semibold text-[10px]">${calendarSvg} Due Tomorrow</span>`;
+  return `<span class="flex items-center gap-1 text-slate-500 bg-slate-50 border border-slate-200/50 rounded-md px-1.5 py-0.5 text-[10px]">${calendarSvg} ${diff} days left (${deadline})</span>`;
 }
 
 // ─── HTML escape helper (prevents XSS from user-supplied content) ──────────
@@ -182,7 +185,7 @@ function renderKanbanBoard() {
   const projTabs = [
     `<button data-projid="all" class="px-3 py-1.5 text-xs font-semibold rounded-lg text-nowrap transition-all ${state.activeProjectId==='all'?'bg-slate-900 text-white shadow':'text-slate-600 hover:bg-slate-50'}">All Projects</button>`,
     ...state.projects.map(p => `<button data-projid="${p.id}" class="px-3 py-1.5 text-xs font-semibold rounded-lg text-nowrap transition-all ${state.activeProjectId===p.id?'bg-indigo-600 text-white shadow':'text-slate-600 hover:bg-slate-50'}">${esc(p.name)}</button>`),
-    `<button id="btn-new-project" class="px-2.5 py-1.5 text-xs font-semibold border border-dashed border-slate-300 rounded-lg text-indigo-600 hover:bg-indigo-50 flex items-center gap-1 shrink-0">+ New Project</button>`,
+    `<button id="btn-new-project" class="px-2.5 py-1.5 text-xs font-semibold border border-dashed border-slate-300 rounded-lg text-indigo-600 hover:bg-indigo-50 flex items-center gap-1 shrink-0"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-3.5 h-3.5 mr-1"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>New Project</button>`,
   ].join('');
 
   const cardHtml = (task) => {
@@ -190,8 +193,8 @@ function renderKanbanBoard() {
     const projTag = (proj && state.activeProjectId === 'all')
       ? `<span class="bg-indigo-50 text-indigo-600 text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wide">${esc(proj.name)}</span>` : '';
     const idx = statuses.indexOf(task.status);
-    const ml = idx > 0 ? `<button data-action="move" data-id="${task.id}" data-target="${statuses[idx-1]}" class="p-1 border border-slate-200 rounded text-slate-500 hover:text-indigo-600 hover:bg-slate-50 transition-colors" title="Move back">←</button>` : '';
-    const mr = idx < 3 ? `<button data-action="move" data-id="${task.id}" data-target="${statuses[idx+1]}" class="p-1 border border-slate-200 rounded text-slate-500 hover:text-indigo-600 hover:bg-slate-50 transition-colors" title="Move forward">→</button>` : '';
+    const ml = idx > 0 ? `<button data-action="move" data-id="${task.id}" data-target="${statuses[idx-1]}" class="p-1 border border-slate-200 rounded text-slate-500 hover:text-indigo-600 hover:bg-slate-50 transition-colors" title="Move back"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-3.5 h-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" /></svg></button>` : '';
+    const mr = idx < 3 ? `<button data-action="move" data-id="${task.id}" data-target="${statuses[idx+1]}" class="p-1 border border-slate-200 rounded text-slate-500 hover:text-indigo-600 hover:bg-slate-50 transition-colors" title="Move forward"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-3.5 h-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg></button>` : '';
     return `
       <div class="bg-white border border-slate-150 rounded-lg p-3 hover:shadow-md transition-all space-y-2 relative group">
         <div class="flex justify-between items-start gap-1">${projTag}<div class="flex gap-1 items-center ml-auto">${priorityBadge(task.priority)}</div></div>
@@ -200,7 +203,7 @@ function renderKanbanBoard() {
         <div class="flex flex-wrap gap-2 pt-2 border-t border-slate-50 items-center justify-between">
           ${deadlineAlert(task.deadline)}
           <div class="flex gap-1.5">${ml}${mr}
-            <button data-action="delete" data-id="${task.id}" class="p-1 border border-slate-200 rounded text-red-500 hover:bg-red-50 transition-colors opacity-70 group-hover:opacity-100" title="Delete">🗑</button>
+            <button data-action="delete" data-id="${task.id}" class="p-1 border border-slate-200 rounded text-red-500 hover:bg-red-50 transition-colors opacity-70 group-hover:opacity-100" title="Delete"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg></button>
           </div>
         </div>
       </div>`;
@@ -228,19 +231,19 @@ function renderKanbanBoard() {
           <div class="flex items-center gap-2 overflow-x-auto pb-1 max-w-full">${projTabs}</div>
           <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
             <div class="relative">
-              <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none">🔍</span>
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.604 10.604z" /></svg>
               <input id="search-input" type="text" placeholder="Search board tasks..." value="${esc(state.searchQuery)}"
-                class="pl-8 pr-4 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg text-xs outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all w-full sm:w-48 text-slate-800" />
+                class="pl-9 pr-4 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg text-xs outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all w-full sm:w-48 text-slate-800" />
             </div>
             <div class="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1">
               <select id="priority-filter" class="bg-transparent border-0 text-xs font-semibold focus:outline-none text-slate-700 pr-1">
                 <option value="all"   ${state.priorityFilter==='all'   ?'selected':''}>Any Priority</option>
-                <option value="high"  ${state.priorityFilter==='high'  ?'selected':''}>🔴 High</option>
-                <option value="medium"${state.priorityFilter==='medium'?'selected':''}>🟡 Medium</option>
-                <option value="low"   ${state.priorityFilter==='low'   ?'selected':''}>⚪ Low</option>
+                <option value="high"  ${state.priorityFilter==='high'  ?'selected':''}>High Priority</option>
+                <option value="medium"${state.priorityFilter==='medium'?'selected':''}>Medium Priority</option>
+                <option value="low"   ${state.priorityFilter==='low'   ?'selected':''}>Low Priority</option>
               </select>
             </div>
-            <button id="btn-add-task" class="bg-indigo-600 text-white hover:bg-indigo-700 transition-colors shadow px-4 py-2 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5">+ Add Task</button>
+            <button id="btn-add-task" class="bg-indigo-600 text-white hover:bg-indigo-700 transition-colors shadow px-4 py-2 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-3.5 h-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>Add Task</button>
           </div>
         </div>
         ${projDesc}
@@ -310,7 +313,7 @@ function renderDeadlines() {
           ${task.description ? `<p class="text-[11px] text-slate-500 line-clamp-1">${esc(task.description)}</p>` : ''}
         </div>
         <div class="flex items-center gap-3 shrink-0">
-          <span class="text-xs font-mono font-medium text-slate-600 bg-white border border-slate-200 shadow-sm px-2.5 py-1 rounded-lg">📅 ${task.deadline}</span>
+          <span class="flex items-center gap-1.5 text-xs font-mono font-medium text-slate-600 bg-white border border-slate-200 shadow-sm px-2.5 py-1 rounded-lg"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5 text-slate-400"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" /></svg>${task.deadline}</span>
           ${statusBadge(task.status)}
         </div>
       </div>`;
@@ -325,17 +328,22 @@ function renderDeadlines() {
       </div>`;
   }
 
+  const fireSvg = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M15.362 5.214A8.252 8.252 0 0112 21 8.25 8.25 0 016.038 7.048 8.287 8.287 0 009 9.6a8.983 8.983 0 013.361-6.867 8.21 8.21 0 003 2.48z" /><path stroke-linecap="round" stroke-linejoin="round" d="M12 18a3.75 3.75 0 00.495-7.467 5.99 5.99 0 00-1.925 3.546 5.974 5.974 0 01-2.133-1A3.75 3.75 0 0012 18z" /></svg>`;
+  const alertSvg = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>`;
+  const calendarSvg = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" /></svg>`;
+  const checkSvg = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`;
+
   document.getElementById('tab-content').innerHTML = `
     <div class="bg-white rounded-xl shadow-sm border border-slate-150 p-6 space-y-6">
       <div>
-        <h2 class="text-lg font-bold text-slate-900">⏰ Critical Milestones &amp; Deadlines Tracker</h2>
+        <h2 class="text-lg font-bold text-slate-900 flex items-center"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5 text-indigo-600 mr-2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>Critical Milestones &amp; Deadlines Tracker</h2>
         <p class="text-xs text-slate-500 mt-1">Chronologically monitors active items to ensure coursework requirements are never submitted overdue.</p>
       </div>
       <div class="space-y-6">
-        ${overdue.length > 0 ? section('Overdue Actions','🔥','text-rose-700 bg-rose-50 border border-rose-100',overdue,'bg-rose-500 text-white border-rose-600','') : ''}
-        ${section('Due This Week','⚠','text-amber-700 bg-amber-50 border border-amber-100',activeSoon,'bg-amber-500 text-white border-amber-600','No deadlines active within the next 7 days.')}
-        ${section('Future Deadlines','📅','text-slate-700 bg-slate-100 border border-slate-200',future,'bg-indigo-100 text-indigo-800 border-indigo-200','No other future deadlines configured.')}
-        ${section('Saved / Completed','✅','text-emerald-700 bg-emerald-50 border border-emerald-100',completed,'bg-emerald-500 text-white border-emerald-600','Completed tasks with deadlines will settle here.')}
+        ${overdue.length > 0 ? section('Overdue Actions',fireSvg,'text-rose-700 bg-rose-50 border border-rose-100',overdue,'bg-rose-500 text-white border-rose-600','') : ''}
+        ${section('Due This Week',alertSvg,'text-amber-700 bg-amber-50 border border-amber-100',activeSoon,'bg-amber-500 text-white border-amber-600','No deadlines active within the next 7 days.')}
+        ${section('Future Deadlines',calendarSvg,'text-slate-700 bg-slate-100 border border-slate-200',future,'bg-indigo-100 text-indigo-800 border-indigo-200','No other future deadlines configured.')}
+        ${section('Saved / Completed',checkSvg,'text-emerald-700 bg-emerald-50 border border-emerald-100',completed,'bg-emerald-500 text-white border-emerald-600','Completed tasks with deadlines will settle here.')}
       </div>
     </div>`;
 }
