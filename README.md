@@ -1,20 +1,42 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# DevBoard Project Tracker
 
-# Run and deploy your AI Studio app
+A PHP & MySQL project/task management web application built for a PHP coursework assignment.
 
-This contains everything you need to run your app locally.
+## Stack
 
-View your app in AI Studio: https://ai.studio/apps/d603bb2d-c552-4ff9-bff9-b45e48e54098
+- **Frontend:** HTML5, Tailwind CSS (CDN), Vanilla JavaScript
+- **Backend:** PHP 8.2+ with PDO
+- **Database:** MySQL (via MAMP)
 
-## Run Locally
+## Features
 
-**Prerequisites:**  Node.js
+- Kanban board with 4 columns: To Do, In Progress, Under Review, Completed
+- Filter tasks by project, search text, and priority level
+- Create / delete projects and tasks via modal forms
+- Move tasks forward and backward through statuses
+- Urgent Deadlines Tracker with Overdue / This Week / Future / Completed sections
 
+## Setup (MAMP)
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+1. Start MAMP and turn on Apache + MySQL.
+2. Open `http://localhost:8888/phpmyadmin/`, click the **SQL** tab, paste the contents of `schema.sql`, and click **Go**.
+3. Copy all project files into `/Applications/MAMP/htdocs/project-tracker/`.
+4. Open `http://localhost:8888/project-tracker/` in your browser.
+
+> **Note:** MAMP Free may run MySQL on port 8889 instead of 3306. If the connection fails, edit `db_connect.php` and replace `'localhost'` with `'localhost:/Applications/MAMP/tmp/mysql/mysql.sock'`.
+
+## File Structure
+
+| File | Purpose |
+|------|---------|
+| `schema.sql` | Database schema and seed data |
+| `db_connect.php` | PDO database connection singleton |
+| `api.php` | REST API endpoint (GET + POST) |
+| `index.html` | Single-page application shell |
+| `app.js` | All JavaScript — state, rendering, API calls |
+
+## Database Tables
+
+**projects** — `id`, `name`, `description`, `created_at`
+
+**tasks** — `id`, `project_id` (FK), `title`, `description`, `status`, `priority`, `deadline`, `created_at`

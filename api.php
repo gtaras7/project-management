@@ -37,8 +37,8 @@ switch ($method) {
                 http_response_code(400); echo json_encode(['error' => "Field 'name' required."]); exit();
             }
             $id   = $data['id'] ?? uniqid('proj_', true);
-            $name = htmlspecialchars(strip_tags($data['name']));
-            $desc = htmlspecialchars(strip_tags($data['description'] ?? ''));
+            $name = trim(strip_tags($data['name']));
+            $desc = trim(strip_tags($data['description'] ?? ''));
             $db->prepare('INSERT INTO `projects` (id,name,description) VALUES (:id,:name,:description)')
                ->execute([':id'=>$id,':name'=>$name,':description'=>$desc]);
             http_response_code(201);
@@ -49,8 +49,8 @@ switch ($method) {
                 http_response_code(400); echo json_encode(['error' => "Fields 'projectId' and 'title' required."]); exit();
             }
             $id       = $data['id'] ?? uniqid('task_', true);
-            $title    = htmlspecialchars(strip_tags($data['title']));
-            $desc     = htmlspecialchars(strip_tags($data['description'] ?? ''));
+            $title    = trim(strip_tags($data['title']));
+            $desc     = trim(strip_tags($data['description'] ?? ''));
             $status   = $data['status']   ?? 'todo';
             $priority = $data['priority'] ?? 'low';
             $allowed_statuses   = ['todo', 'in_progress', 'review', 'done'];
@@ -71,6 +71,10 @@ switch ($method) {
         } elseif ($action === 'update_task') {
             if (empty($data['id'])) {
                 http_response_code(400); echo json_encode(['error' => "Field 'id' required."]); exit();
+            }
+            $allowed_statuses = ['todo', 'in_progress', 'review', 'done'];
+            if (!in_array($data['status'] ?? '', $allowed_statuses)) {
+                http_response_code(400); echo json_encode(['error' => 'Invalid status value.']); exit();
             }
             $stmt = $db->prepare('UPDATE `tasks` SET status=:status WHERE id=:id');
             $stmt->execute([':status'=>$data['status'],':id'=>$data['id']]);

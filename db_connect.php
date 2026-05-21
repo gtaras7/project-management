@@ -4,7 +4,7 @@
  * MAMP default MySQL password is 'root'. Change if you set a custom password.
  */
 class DatabaseConnection {
-    private static string $host     = 'localhost';
+    private static string $host     = 'localhost';  // MAMP free (v5+): use 'localhost:/Applications/MAMP/tmp/mysql/mysql.sock' if port 3306 fails
     private static string $db_name  = 'project_tracker';
     private static string $username = 'root';
     private static string $password = 'root';
