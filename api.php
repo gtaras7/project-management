@@ -53,6 +53,13 @@ switch ($method) {
             $desc     = htmlspecialchars(strip_tags($data['description'] ?? ''));
             $status   = $data['status']   ?? 'todo';
             $priority = $data['priority'] ?? 'low';
+            $allowed_statuses   = ['todo', 'in_progress', 'review', 'done'];
+            $allowed_priorities = ['low', 'medium', 'high'];
+            if (!in_array($status, $allowed_statuses) || !in_array($priority, $allowed_priorities)) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Invalid status or priority value.']);
+                exit();
+            }
             $deadline = !empty($data['deadline']) ? $data['deadline'] : null;
             $db->prepare('INSERT INTO `tasks` (id,project_id,title,description,status,priority,deadline)
                           VALUES (:id,:project_id,:title,:description,:status,:priority,:deadline)')

@@ -21,7 +21,7 @@ class DatabaseConnection {
                 ]);
             } catch (PDOException $e) {
                 http_response_code(500);
-                echo json_encode(['error' => 'DB connection failed.', 'debug' => $e->getMessage()]);
+                echo json_encode(['error' => 'DB connection failed. Check MAMP is running and credentials are correct.']);
                 exit();
             }
         }
