@@ -73,11 +73,41 @@ switch ($method) {
                 http_response_code(400); echo json_encode(['error' => "Field 'id' required."]); exit();
             }
             $allowed_statuses = ['todo', 'in_progress', 'review', 'done'];
-            if (!in_array($data['status'] ?? '', $allowed_statuses)) {
-                http_response_code(400); echo json_encode(['error' => 'Invalid status value.']); exit();
+            $allowed_priorities = ['low', 'medium', 'high'];
+            
+            // Allow full update of task properties
+            $title    = isset($data['title']) ? trim(strip_tags($data['title'])) : null;
+            $desc     = isset($data['description']) ? trim(strip_tags($data['description'])) : null;
+            $status   = $data['status'] ?? null;
+            $priority = $data['priority'] ?? null;
+            $deadline = !empty($data['deadline']) ? $data['deadline'] : null;
+            
+            $updates = [];
+            $params = [':id' => $data['id']];
+            
+            if ($title !== null) { $updates[] = 'title=:title'; $params[':title'] = $title; }
+            if ($desc !== null) { $updates[] = 'description=:description'; $params[':description'] = $desc; }
+            if ($status !== null) {
+                if (!in_array($status, $allowed_statuses)) {
+                    http_response_code(400); echo json_encode(['error' => 'Invalid status value.']); exit();
+                }
+                $updates[] = 'status=:status'; $params[':status'] = $status;
             }
-            $stmt = $db->prepare('UPDATE `tasks` SET status=:status WHERE id=:id');
-            $stmt->execute([':status'=>$data['status'],':id'=>$data['id']]);
+            if ($priority !== null) {
+                if (!in_array($priority, $allowed_priorities)) {
+                    http_response_code(400); echo json_encode(['error' => 'Invalid priority value.']); exit();
+                }
+                $updates[] = 'priority=:priority'; $params[':priority'] = $priority;
+            }
+            if (isset($data['deadline'])) { 
+                $updates[] = 'deadline=:deadline'; $params[':deadline'] = $deadline; 
+            }
+            
+            if (!empty($updates)) {
+                $sql = 'UPDATE `tasks` SET ' . implode(', ', $updates) . ' WHERE id=:id';
+                $stmt = $db->prepare($sql);
+                $stmt->execute($params);
+            }
             echo json_encode(['status'=>'updated']);
 
         } elseif ($action === 'delete_task') {
@@ -85,6 +115,23 @@ switch ($method) {
                 http_response_code(400); echo json_encode(['error' => "Field 'id' required."]); exit();
             }
             $db->prepare('DELETE FROM `tasks` WHERE id=:id')->execute([':id'=>$data['id']]);
+            echo json_encode(['status'=>'deleted']);
+
+        } elseif ($action === 'update_project') {
+            if (empty($data['id']) || empty($data['name'])) {
+                http_response_code(400); echo json_encode(['error' => "Fields 'id' and 'name' required."]); exit();
+            }
+            $name = trim(strip_tags($data['name']));
+            $desc = trim(strip_tags($data['description'] ?? ''));
+            $db->prepare('UPDATE `projects` SET name=:name, description=:description WHERE id=:id')
+               ->execute([':id'=>$data['id'], ':name'=>$name, ':description'=>$desc]);
+            echo json_encode(['status'=>'updated']);
+
+        } elseif ($action === 'delete_project') {
+            if (empty($data['id'])) {
+                http_response_code(400); echo json_encode(['error' => "Field 'id' required."]); exit();
+            }
+            $db->prepare('DELETE FROM `projects` WHERE id=:id')->execute([':id'=>$data['id']]);
             echo json_encode(['status'=>'deleted']);
 
         } else {

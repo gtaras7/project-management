@@ -55,9 +55,38 @@ async function apiUpdateTask(id, status) {
   if (t) t.status = status;
 }
 
+async function apiFullUpdateTask(id, taskData) {
+  await apiFetch('update_task', { id, ...taskData });
+  const t = state.tasks.find(t => t.id === id);
+  if (t) {
+    t.title = taskData.title;
+    t.description = taskData.description;
+    t.status = taskData.status;
+    t.priority = taskData.priority;
+    t.deadline = taskData.deadline;
+    t.project_id = taskData.projectId;
+  }
+}
+
 async function apiDeleteTask(id) {
   await apiFetch('delete_task', { id });
   state.tasks = state.tasks.filter(t => t.id !== id);
+}
+
+async function apiUpdateProject(id, name, description) {
+  await apiFetch('update_project', { id, name, description });
+  const p = state.projects.find(p => p.id === id);
+  if (p) {
+    p.name = name;
+    p.description = description;
+  }
+}
+
+async function apiDeleteProject(id) {
+  await apiFetch('delete_project', { id });
+  state.projects = state.projects.filter(p => p.id !== id);
+  state.tasks = state.tasks.filter(t => t.project_id !== id);
+  if (state.activeProjectId === id) state.activeProjectId = 'all';
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -180,7 +209,13 @@ function renderKanbanBoard() {
 
   const activeProj = state.projects.find(p => p.id === state.activeProjectId);
   const projDesc = (state.activeProjectId !== 'all' && activeProj)
-    ? `<div class="mt-4 pt-4 border-t border-slate-100 text-slate-600 leading-relaxed text-xs">${esc(activeProj.description || '')}</div>` : '';
+    ? `<div class="mt-4 pt-4 border-t border-slate-100 flex items-start justify-between gap-4">
+         <div class="text-slate-600 leading-relaxed text-xs flex-1">${esc(activeProj.description || '')}</div>
+         <div class="flex gap-2 shrink-0">
+           <button data-action="edit-project" data-id="${activeProj.id}" class="text-[11px] px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded transition-colors">Edit Project</button>
+           <button data-action="delete-project" data-id="${activeProj.id}" class="text-[11px] px-2 py-1 bg-red-50 hover:bg-red-100 text-red-600 font-semibold rounded transition-colors">Delete Project</button>
+         </div>
+       </div>` : '';
 
   const projTabs = [
     `<button data-projid="all" class="px-3 py-1.5 text-xs font-semibold rounded-lg text-nowrap transition-all ${state.activeProjectId==='all'?'bg-slate-900 text-white shadow':'text-slate-600 hover:bg-slate-50'}">All Projects</button>`,
@@ -203,6 +238,7 @@ function renderKanbanBoard() {
         <div class="flex flex-wrap gap-2 pt-2 border-t border-slate-50 items-center justify-between">
           ${deadlineAlert(task.deadline)}
           <div class="flex gap-1.5">${ml}${mr}
+            <button data-action="edit-task" data-id="${task.id}" class="p-1 border border-slate-200 rounded text-slate-500 hover:text-indigo-600 hover:bg-slate-50 transition-colors opacity-70 group-hover:opacity-100" title="Edit"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg></button>
             <button data-action="delete" data-id="${task.id}" class="p-1 border border-slate-200 rounded text-red-500 hover:bg-red-50 transition-colors opacity-70 group-hover:opacity-100" title="Delete"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg></button>
           </div>
         </div>
@@ -270,6 +306,19 @@ function renderKanbanBoard() {
       if (!confirm('Delete this task?')) return;
       try { await apiDeleteTask(btn.dataset.id); render(); }
       catch (e) { alert('Failed to delete: ' + e.message); }
+    })
+  );
+  document.querySelectorAll('[data-action="edit-task"]').forEach(btn =>
+    btn.addEventListener('click', () => openEditTaskModal(btn.dataset.id))
+  );
+  document.querySelectorAll('[data-action="edit-project"]').forEach(btn =>
+    btn.addEventListener('click', () => openEditProjectModal(btn.dataset.id))
+  );
+  document.querySelectorAll('[data-action="delete-project"]').forEach(btn =>
+    btn.addEventListener('click', async () => {
+      if (!confirm('Delete this project and all its tasks? This cannot be undone.')) return;
+      try { await apiDeleteProject(btn.dataset.id); render(); }
+      catch (e) { alert('Failed to delete project: ' + e.message); }
     })
   );
 }
@@ -350,8 +399,22 @@ function renderDeadlines() {
 
 // ─── Modals ───────────────────────────────────────────────────────────────────
 function openProjectModal() {
+  document.getElementById('modal-project-title').textContent = 'Create New Course Project';
+  document.getElementById('proj-id').value = '';
   document.getElementById('proj-name').value = '';
   document.getElementById('proj-desc').value = '';
+  document.getElementById('proj-name-error').classList.add('hidden');
+  const m = document.getElementById('modal-project');
+  m.classList.remove('hidden'); m.classList.add('flex');
+  document.getElementById('proj-name').focus();
+}
+function openEditProjectModal(id) {
+  const p = state.projects.find(p => p.id === id);
+  if (!p) return;
+  document.getElementById('modal-project-title').textContent = 'Edit Course Project';
+  document.getElementById('proj-id').value = p.id;
+  document.getElementById('proj-name').value = p.name;
+  document.getElementById('proj-desc').value = p.description || '';
   document.getElementById('proj-name-error').classList.add('hidden');
   const m = document.getElementById('modal-project');
   m.classList.remove('hidden'); m.classList.add('flex');
@@ -361,11 +424,14 @@ function closeProjectModal() {
   const m = document.getElementById('modal-project');
   m.classList.add('hidden'); m.classList.remove('flex');
 }
+
 function openTaskModal() {
   if (!state.projects.length) {
     alert('Please create a project first before adding tasks.');
     return;
   }
+  document.getElementById('modal-task-title').textContent = 'Record New Tracked Task';
+  document.getElementById('task-id').value = '';
   document.getElementById('task-title').value   = '';
   document.getElementById('task-desc').value    = '';
   document.getElementById('task-deadline').value = '';
@@ -376,6 +442,25 @@ function openTaskModal() {
   ).join('');
   document.getElementById('task-priority').value = 'low';
   document.getElementById('task-status').value   = 'todo';
+  const m = document.getElementById('modal-task');
+  m.classList.remove('hidden'); m.classList.add('flex');
+  document.getElementById('task-title').focus();
+}
+function openEditTaskModal(id) {
+  const t = state.tasks.find(t => t.id === id);
+  if (!t) return;
+  document.getElementById('modal-task-title').textContent = 'Edit Tracked Task';
+  document.getElementById('task-id').value = t.id;
+  document.getElementById('task-title').value   = t.title;
+  document.getElementById('task-desc').value    = t.description || '';
+  document.getElementById('task-deadline').value = t.deadline || '';
+  document.getElementById('task-title-error').classList.add('hidden');
+  const sel = document.getElementById('task-project');
+  sel.innerHTML = state.projects.map(p =>
+    `<option value="${p.id}" ${t.project_id === p.id ? 'selected':''}>${esc(p.name)}</option>`
+  ).join('');
+  document.getElementById('task-priority').value = t.priority;
+  document.getElementById('task-status').value   = t.status;
   const m = document.getElementById('modal-task');
   m.classList.remove('hidden'); m.classList.add('flex');
   document.getElementById('task-title').focus();
@@ -392,29 +477,42 @@ document.getElementById('modal-task').addEventListener('click', e => { if (e.tar
 
 document.getElementById('form-project').addEventListener('submit', async (e) => {
   e.preventDefault();
+  const id = document.getElementById('proj-id').value;
   const name = document.getElementById('proj-name').value.trim();
   if (!name) { document.getElementById('proj-name-error').classList.remove('hidden'); return; }
   try {
-    await apiCreateProject(name, document.getElementById('proj-desc').value.trim());
+    if (id) {
+      await apiUpdateProject(id, name, document.getElementById('proj-desc').value.trim());
+    } else {
+      await apiCreateProject(name, document.getElementById('proj-desc').value.trim());
+    }
     closeProjectModal(); render();
-  } catch (err) { alert('Failed to create project: ' + err.message); }
+  } catch (err) { alert('Failed to save project: ' + err.message); }
 });
 
 document.getElementById('form-task').addEventListener('submit', async (e) => {
   e.preventDefault();
+  const id = document.getElementById('task-id').value;
   const title = document.getElementById('task-title').value.trim();
   if (!title) { document.getElementById('task-title-error').classList.remove('hidden'); return; }
+  
+  const taskData = {
+    projectId:   document.getElementById('task-project').value,
+    title,
+    description: document.getElementById('task-desc').value.trim(),
+    deadline:    document.getElementById('task-deadline').value,
+    priority:    document.getElementById('task-priority').value,
+    status:      document.getElementById('task-status').value,
+  };
+  
   try {
-    await apiCreateTask({
-      projectId:   document.getElementById('task-project').value,
-      title,
-      description: document.getElementById('task-desc').value.trim(),
-      deadline:    document.getElementById('task-deadline').value,
-      priority:    document.getElementById('task-priority').value,
-      status:      document.getElementById('task-status').value,
-    });
+    if (id) {
+      await apiFullUpdateTask(id, taskData);
+    } else {
+      await apiCreateTask(taskData);
+    }
     closeTaskModal(); render();
-  } catch (err) { alert('Failed to create task: ' + err.message); }
+  } catch (err) { alert('Failed to save task: ' + err.message); }
 });
 
 // ─── Orchestrator & Init ──────────────────────────────────────────────────────

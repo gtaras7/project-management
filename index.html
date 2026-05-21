@@ -22,8 +22,9 @@
   <!-- Modal: Create Project -->
   <div id="modal-project" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm items-center justify-center p-4 z-50">
     <div class="bg-white rounded-xl shadow-xl max-w-md w-full border border-slate-100 p-6 space-y-4">
-      <h3 class="text-base font-bold text-slate-900 border-b border-slate-100 pb-3">Create New Course Project</h3>
+      <h3 id="modal-project-title" class="text-base font-bold text-slate-900 border-b border-slate-100 pb-3">Course Project</h3>
       <form id="form-project" class="space-y-4">
+        <input type="hidden" id="proj-id" value="" />
         <div class="space-y-1.5">
           <label class="text-xs font-bold text-slate-700 block">Project Title</label>
           <input id="proj-name" type="text" placeholder="e.g. php-contact-form" required
@@ -48,8 +49,9 @@
   <!-- Modal: Create Task -->
   <div id="modal-task" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm items-center justify-center p-4 z-50">
     <div class="bg-white rounded-xl shadow-xl max-w-lg w-full border border-slate-100 p-6 space-y-4">
-      <h3 class="text-base font-bold text-slate-900 border-b border-slate-100 pb-3">Record New Tracked Task</h3>
+      <h3 id="modal-task-title" class="text-base font-bold text-slate-900 border-b border-slate-100 pb-3">Tracked Task</h3>
       <form id="form-task" class="space-y-4">
+        <input type="hidden" id="task-id" value="" />
         <div class="space-y-1.5">
           <label class="text-xs font-bold text-slate-700 block">Task Name</label>
           <input id="task-title" type="text" placeholder="e.g. Code password validation middleware" required
