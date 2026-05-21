@@ -1,6 +1,6 @@
 <?php
 /**
- * api.php — REST endpoint for DevBoard Project Tracker
+ * backend.php — REST endpoint for DevBoard Project Tracker
  * All responses are JSON. Routes via ?action= query param.
  */
 header('Access-Control-Allow-Origin: *');
