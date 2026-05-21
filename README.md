@@ -23,8 +23,6 @@ A PHP & MySQL project/task management web application built for a PHP coursework
 3. Copy all project files into `/Applications/MAMP/htdocs/project-tracker/`.
 4. Open `http://localhost:8888/project-tracker/` in your browser.
 
-> **Note:** MAMP Free may run MySQL on port 8889 instead of 3306. If the connection fails, edit `db_connect.php` and replace `'localhost'` with `'localhost:/Applications/MAMP/tmp/mysql/mysql.sock'`.
-
 ## File Structure
 
 | File | Purpose |
