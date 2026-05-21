@@ -1,6 +1,0 @@
-{
-  "name": "Project & Task Manager",
-  "description": "A modern project and task status board with visual deadlines and an interactive PHP class helper panel to generate corresponding PHP backends, PDO connections, and SQL schemas.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
