@@ -1,22 +1,22 @@
 // ─── State ────────────────────────────────────────────────────────────────────
 const state = {
-  projects:        [],
-  tasks:           [],
-  activeTab:       'board',   // 'board' | 'deadlines'
+  projects: [],
+  tasks: [],
+  activeTab: 'board',   // 'board' | 'deadlines'
   activeProjectId: 'all',
-  searchQuery:     '',
-  priorityFilter:  'all',     // 'all' | 'low' | 'medium' | 'high'
+  searchQuery: '',
+  priorityFilter: 'all',     // 'all' | 'low' | 'medium' | 'high'
 };
 
 const API = 'backend.php';
 
 // ─── API wrappers ─────────────────────────────────────────────────────────────
 async function apiFetch(action, body = null) {
-  const url  = `${API}?action=${action}`;
+  const url = `${API}?action=${action}`;
   const opts = body
     ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
     : { method: 'GET' };
-  const res  = await fetch(url, opts);
+  const res = await fetch(url, opts);
   const json = await res.json();
   if (!res.ok) throw new Error(json.error || 'API error');
   return json;
@@ -25,7 +25,7 @@ async function apiFetch(action, body = null) {
 async function loadData() {
   const [projects, tasks] = await Promise.all([apiFetch('projects'), apiFetch('tasks')]);
   state.projects = projects;
-  state.tasks    = tasks;
+  state.tasks = tasks;
 }
 
 async function apiCreateProject(name, description) {
@@ -39,13 +39,13 @@ async function apiCreateTask(taskData) {
   await apiFetch('create_task', { id, ...taskData });
   state.tasks.push({
     id,
-    project_id:  taskData.projectId,
-    title:       taskData.title,
+    project_id: taskData.projectId,
+    title: taskData.title,
     description: taskData.description,
-    status:      taskData.status,
-    priority:    taskData.priority,
-    deadline:    taskData.deadline,
-    created_at:  new Date().toISOString(),
+    status: taskData.status,
+    priority: taskData.priority,
+    deadline: taskData.deadline,
+    created_at: new Date().toISOString(),
   });
 }
 
@@ -91,7 +91,7 @@ async function apiDeleteProject(id) {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function getDaysDiff(deadlineStr) {
-  const today = new Date(); today.setHours(0,0,0,0);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
   const [y, m, d] = deadlineStr.split('-').map(Number);
   const due = new Date(y, m - 1, d); // local midnight — avoids UTC-shift on ISO strings
   return Math.ceil((due - today) / 86400000);
@@ -105,7 +105,7 @@ function getOverdueCount() {
 }
 
 function priorityBadge(p) {
-  if (p === 'high')   return `<span class="bg-rose-50 border border-rose-200 text-rose-700 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide">High</span>`;
+  if (p === 'high') return `<span class="bg-rose-50 border border-rose-200 text-rose-700 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide">High</span>`;
   if (p === 'medium') return `<span class="bg-amber-50 border border-amber-200 text-amber-700 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide">Medium</span>`;
   return `<span class="bg-slate-100 border border-slate-200 text-slate-600 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide">Low</span>`;
 }
@@ -116,7 +116,7 @@ function deadlineAlert(deadline) {
   const warningSvg = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>`;
   const calendarSvg = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" /></svg>`;
 
-  if (diff < 0)   return `<span class="flex items-center gap-1 text-rose-600 bg-rose-50 border border-rose-100 rounded-md px-1.5 py-0.5 font-semibold text-[10px]">${warningSvg} Overdue by ${Math.abs(diff)}d</span>`;
+  if (diff < 0) return `<span class="flex items-center gap-1 text-rose-600 bg-rose-50 border border-rose-100 rounded-md px-1.5 py-0.5 font-semibold text-[10px]">${warningSvg} Overdue by ${Math.abs(diff)}d</span>`;
   if (diff === 0) return `<span class="flex items-center gap-1 text-rose-600 bg-rose-50 border border-rose-100 rounded-md px-1.5 py-0.5 font-semibold text-[10px]">${warningSvg} Due Today</span>`;
   if (diff === 1) return `<span class="flex items-center gap-1 text-amber-600 bg-amber-50 border border-amber-100 rounded-md px-1.5 py-0.5 font-semibold text-[10px]">${calendarSvg} Due Tomorrow</span>`;
   return `<span class="flex items-center gap-1 text-slate-500 bg-slate-50 border border-slate-200/50 rounded-md px-1.5 py-0.5 text-[10px]">${calendarSvg} ${diff} days left (${deadline})</span>`;
@@ -132,8 +132,8 @@ function esc(str) {
 // ─── Render: Header ───────────────────────────────────────────────────────────
 function renderHeader() {
   const completed = state.tasks.filter(t => t.status === 'done').length;
-  const total     = state.tasks.length;
-  const overdue   = getOverdueCount();
+  const total = state.tasks.length;
+  const overdue = getOverdueCount();
   const overdueChip = overdue > 0
     ? `<div class="bg-rose-500/10 border border-rose-500/20 rounded-xl py-1.5 px-3 flex items-center gap-2 text-xs">
          <span class="h-2 w-2 rounded-full bg-rose-500 animate-pulse"></span>
@@ -144,11 +144,8 @@ function renderHeader() {
   document.getElementById('app-header').innerHTML = `
     <div class="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div class="flex items-center gap-3">
-        <div class="p-2.5 bg-indigo-600 rounded-xl shadow shadow-indigo-500/30">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/>
-            <line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>
-          </svg>
+        <div class="h-10 w-10 rounded-xl overflow-hidden shadow-lg shadow-[#3BBDE5]/10 bg-slate-850 flex items-center justify-center shrink-0 border border-slate-700">
+          <img src="time-svgrepo-com.svg" alt="Logo" class="h-full w-full object-cover" />
         </div>
         <div>
           <h1 class="text-base font-extrabold tracking-tight text-white">Project Tracker</h1>
@@ -156,7 +153,7 @@ function renderHeader() {
       </div>
       <div class="flex flex-wrap items-center gap-3">
         <div class="bg-slate-800 border border-slate-700 rounded-xl py-1.5 px-3 flex items-center gap-2 text-xs">
-          <span class="h-2 w-2 rounded-full bg-indigo-500"></span>
+          <span class="h-2 w-2 rounded-full bg-[#3BBDE5]"></span>
           <span class="text-slate-400">Projects:</span>
           <span class="font-mono font-bold text-slate-200">${state.projects.length}</span>
         </div>
@@ -173,14 +170,13 @@ function renderHeader() {
 // ─── Render: Tab Nav ──────────────────────────────────────────────────────────
 function renderTabNav() {
   const tabs = [
-    { id: 'board',     label: 'Task Kanban Board' },
+    { id: 'board', label: 'Task Kanban Board' },
     { id: 'deadlines', label: 'Urgent Deadlines Tracker' },
   ];
   document.getElementById('tab-nav').innerHTML = tabs.map(tab => `
-    <button data-tab="${tab.id}" class="flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-lg transition-all ${
-      state.activeTab === tab.id
-        ? 'bg-white text-indigo-600 border border-slate-200 font-extrabold shadow-sm'
-        : 'text-slate-600 hover:text-slate-900'}">
+    <button data-tab="${tab.id}" class="flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-lg transition-all ${state.activeTab === tab.id
+      ? 'bg-white text-indigo-600 border border-slate-200 font-extrabold shadow-sm'
+      : 'text-slate-600 hover:text-slate-900'}">
       ${tab.label}
     </button>`).join('');
   document.querySelectorAll('[data-tab]').forEach(btn =>
@@ -190,18 +186,18 @@ function renderTabNav() {
 
 // ─── Render: Kanban Board ─────────────────────────────────────────────────────
 function renderKanbanBoard() {
-  const statuses = ['todo','in_progress','review','done'];
+  const statuses = ['todo', 'in_progress', 'review', 'done'];
   const cols = [
-    { status:'todo',        label:'To Do',         hBg:'bg-slate-100',                                 tC:'text-slate-700'  },
-    { status:'in_progress', label:'In Progress',   hBg:'bg-indigo-50/70 border border-indigo-100/50',  tC:'text-indigo-800' },
-    { status:'review',      label:'Under Review',  hBg:'bg-amber-50/70 border border-amber-100/50',    tC:'text-amber-800'  },
-    { status:'done',        label:'Completed',     hBg:'bg-emerald-50/70 border border-emerald-100/50',tC:'text-emerald-800'},
+    { status: 'todo', label: 'To Do', hBg: 'bg-slate-100', tC: 'text-slate-700' },
+    { status: 'in_progress', label: 'In Progress', hBg: 'bg-indigo-50/70 border border-indigo-100/50', tC: 'text-indigo-800' },
+    { status: 'review', label: 'Under Review', hBg: 'bg-amber-50/70 border border-amber-100/50', tC: 'text-amber-800' },
+    { status: 'done', label: 'Completed', hBg: 'bg-emerald-50/70 border border-emerald-100/50', tC: 'text-emerald-800' },
   ];
 
   const filtered = state.tasks.filter(t => {
     const mp = state.activeProjectId === 'all' || t.project_id === state.activeProjectId;
     const ms = !state.searchQuery || t.title.toLowerCase().includes(state.searchQuery.toLowerCase()) ||
-               (t.description||'').toLowerCase().includes(state.searchQuery.toLowerCase());
+      (t.description || '').toLowerCase().includes(state.searchQuery.toLowerCase());
     const mpr = state.priorityFilter === 'all' || t.priority === state.priorityFilter;
     return mp && ms && mpr;
   });
@@ -217,8 +213,8 @@ function renderKanbanBoard() {
        </div>` : '';
 
   const projTabs = [
-    `<button data-projid="all" class="px-3 py-1.5 text-xs font-semibold rounded-lg text-nowrap transition-all ${state.activeProjectId==='all'?'bg-slate-900 text-white shadow':'text-slate-600 hover:bg-slate-50'}">All Projects</button>`,
-    ...state.projects.map(p => `<button data-projid="${p.id}" class="px-3 py-1.5 text-xs font-semibold rounded-lg text-nowrap transition-all ${state.activeProjectId===p.id?'bg-indigo-600 text-white shadow':'text-slate-600 hover:bg-slate-50'}">${esc(p.name)}</button>`),
+    `<button data-projid="all" class="px-3 py-1.5 text-xs font-semibold rounded-lg text-nowrap transition-all ${state.activeProjectId === 'all' ? 'bg-slate-900 text-white shadow' : 'text-slate-600 hover:bg-slate-50'}">All Projects</button>`,
+    ...state.projects.map(p => `<button data-projid="${p.id}" class="px-3 py-1.5 text-xs font-semibold rounded-lg text-nowrap transition-all ${state.activeProjectId === p.id ? 'bg-indigo-600 text-white shadow' : 'text-slate-600 hover:bg-slate-50'}">${esc(p.name)}</button>`),
     `<button id="btn-new-project" class="px-2.5 py-1.5 text-xs font-semibold border border-dashed border-slate-300 rounded-lg text-indigo-600 hover:bg-indigo-50 flex items-center gap-1 shrink-0"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-3.5 h-3.5 mr-1"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>New Project</button>`,
   ].join('');
 
@@ -227,8 +223,8 @@ function renderKanbanBoard() {
     const projTag = (proj && state.activeProjectId === 'all')
       ? `<span class="bg-indigo-50 text-indigo-600 text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wide">${esc(proj.name)}</span>` : '';
     const idx = statuses.indexOf(task.status);
-    const ml = idx > 0 ? `<button data-action="move" data-id="${task.id}" data-target="${statuses[idx-1]}" class="p-1 border border-slate-200 rounded text-slate-500 hover:text-indigo-600 hover:bg-slate-50 transition-colors" title="Move back"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-3.5 h-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" /></svg></button>` : '';
-    const mr = idx < 3 ? `<button data-action="move" data-id="${task.id}" data-target="${statuses[idx+1]}" class="p-1 border border-slate-200 rounded text-slate-500 hover:text-indigo-600 hover:bg-slate-50 transition-colors" title="Move forward"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-3.5 h-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg></button>` : '';
+    const ml = idx > 0 ? `<button data-action="move" data-id="${task.id}" data-target="${statuses[idx - 1]}" class="p-1 border border-slate-200 rounded text-slate-500 hover:text-indigo-600 hover:bg-slate-50 transition-colors" title="Move back"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-3.5 h-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" /></svg></button>` : '';
+    const mr = idx < 3 ? `<button data-action="move" data-id="${task.id}" data-target="${statuses[idx + 1]}" class="p-1 border border-slate-200 rounded text-slate-500 hover:text-indigo-600 hover:bg-slate-50 transition-colors" title="Move forward"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-3.5 h-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg></button>` : '';
     return `
       <div class="bg-white border border-slate-150 rounded-lg p-3 hover:shadow-md transition-all space-y-2 relative group">
         <div class="flex justify-between items-start gap-1">${projTag}<div class="flex gap-1 items-center ml-auto">${priorityBadge(task.priority)}</div></div>
@@ -272,10 +268,10 @@ function renderKanbanBoard() {
             </div>
             <div class="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1">
               <select id="priority-filter" class="bg-transparent border-0 text-xs font-semibold focus:outline-none text-slate-700 pr-1">
-                <option value="all"   ${state.priorityFilter==='all'   ?'selected':''}>Any Priority</option>
-                <option value="high"  ${state.priorityFilter==='high'  ?'selected':''}>High Priority</option>
-                <option value="medium"${state.priorityFilter==='medium'?'selected':''}>Medium Priority</option>
-                <option value="low"   ${state.priorityFilter==='low'   ?'selected':''}>Low Priority</option>
+                <option value="all"   ${state.priorityFilter === 'all' ? 'selected' : ''}>Any Priority</option>
+                <option value="high"  ${state.priorityFilter === 'high' ? 'selected' : ''}>High Priority</option>
+                <option value="medium"${state.priorityFilter === 'medium' ? 'selected' : ''}>Medium Priority</option>
+                <option value="low"   ${state.priorityFilter === 'low' ? 'selected' : ''}>Low Priority</option>
               </select>
             </div>
             <button id="btn-add-task" class="bg-indigo-600 text-white hover:bg-indigo-700 transition-colors shadow px-4 py-2 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-3.5 h-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>Add Task</button>
@@ -325,9 +321,9 @@ function renderKanbanBoard() {
 // ─── Render: Deadlines Tracker ────────────────────────────────────────────────
 function renderDeadlines() {
   const withDeadlines = state.tasks.filter(t => !!t.deadline)
-    .sort((a,b) => new Date(a.deadline) - new Date(b.deadline));
+    .sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
 
-  const overdue=[], activeSoon=[], future=[], completed=[];
+  const overdue = [], activeSoon = [], future = [], completed = [];
   withDeadlines.forEach(t => {
     if (t.status === 'done') { completed.push(t); return; }
     const diff = getDaysDiff(t.deadline);
@@ -339,14 +335,14 @@ function renderDeadlines() {
   function cdText(t) {
     if (t.status === 'done') return 'Completed';
     const d = getDaysDiff(t.deadline);
-    if (d < 0)  return `Overdue by ${Math.abs(d)} days`;
+    if (d < 0) return `Overdue by ${Math.abs(d)} days`;
     if (d === 0) return 'Due today';
     if (d === 1) return 'Due tomorrow';
     return `Due in ${d} days`;
   }
   function statusBadge(s) {
-    const m = { in_progress:'bg-indigo-50 border border-indigo-200 text-indigo-700', review:'bg-amber-50 border border-amber-200 text-amber-700', done:'bg-emerald-50 border border-emerald-200 text-emerald-700', todo:'bg-slate-100 border border-slate-200 text-slate-600' };
-    return `<span class="text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-md ${m[s]||m.todo}">${s.replace('_',' ')}</span>`;
+    const m = { in_progress: 'bg-indigo-50 border border-indigo-200 text-indigo-700', review: 'bg-amber-50 border border-amber-200 text-amber-700', done: 'bg-emerald-50 border border-emerald-200 text-emerald-700', todo: 'bg-slate-100 border border-slate-200 text-slate-600' };
+    return `<span class="text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-md ${m[s] || m.todo}">${s.replace('_', ' ')}</span>`;
   }
   function row(task, badgeCls) {
     const proj = state.projects.find(p => p.id === task.project_id);
@@ -371,8 +367,8 @@ function renderDeadlines() {
       <div class="space-y-2.5">
         <h3 class="text-xs font-bold flex items-center gap-1.5 rounded-lg px-3 py-1.5 w-max ${bgCls}">${icon} ${title} (${items.length})</h3>
         ${items.length === 0
-          ? `<p class="text-xs text-slate-400 italic pl-2 py-2">${emptyMsg}</p>`
-          : `<div class="space-y-2">${items.map(t => row(t, badgeCls)).join('')}</div>`}
+        ? `<p class="text-xs text-slate-400 italic pl-2 py-2">${emptyMsg}</p>`
+        : `<div class="space-y-2">${items.map(t => row(t, badgeCls)).join('')}</div>`}
       </div>`;
   }
 
@@ -388,10 +384,10 @@ function renderDeadlines() {
         <p class="text-xs text-slate-500 mt-1">Chronologically monitors active items to ensure coursework requirements are never submitted overdue.</p>
       </div>
       <div class="space-y-6">
-        ${overdue.length > 0 ? section('Overdue Actions',fireSvg,'text-rose-700 bg-rose-50 border border-rose-100',overdue,'bg-rose-500 text-white border-rose-600','') : ''}
-        ${section('Due This Week',alertSvg,'text-amber-700 bg-amber-50 border border-amber-100',activeSoon,'bg-amber-500 text-white border-amber-600','No deadlines active within the next 7 days.')}
-        ${section('Future Deadlines',calendarSvg,'text-slate-700 bg-slate-100 border border-slate-200',future,'bg-indigo-100 text-indigo-800 border-indigo-200','No other future deadlines configured.')}
-        ${section('Saved / Completed',checkSvg,'text-emerald-700 bg-emerald-50 border border-emerald-100',completed,'bg-emerald-500 text-white border-emerald-600','Completed tasks with deadlines will settle here.')}
+        ${overdue.length > 0 ? section('Overdue Actions', fireSvg, 'text-rose-700 bg-rose-50 border border-rose-100', overdue, 'bg-rose-500 text-white border-rose-600', '') : ''}
+        ${section('Due This Week', alertSvg, 'text-amber-700 bg-amber-50 border border-amber-100', activeSoon, 'bg-amber-500 text-white border-amber-600', 'No deadlines active within the next 7 days.')}
+        ${section('Future Deadlines', calendarSvg, 'text-slate-700 bg-slate-100 border border-slate-200', future, 'bg-indigo-100 text-indigo-800 border-indigo-200', 'No other future deadlines configured.')}
+        ${section('Saved / Completed', checkSvg, 'text-emerald-700 bg-emerald-50 border border-emerald-100', completed, 'bg-emerald-500 text-white border-emerald-600', 'Completed tasks with deadlines will settle here.')}
       </div>
     </div>`;
 }
@@ -431,16 +427,16 @@ function openTaskModal() {
   }
   document.getElementById('modal-task-title').textContent = 'Record New Tracked Task';
   document.getElementById('task-id').value = '';
-  document.getElementById('task-title').value   = '';
-  document.getElementById('task-desc').value    = '';
+  document.getElementById('task-title').value = '';
+  document.getElementById('task-desc').value = '';
   document.getElementById('task-deadline').value = '';
   document.getElementById('task-title-error').classList.add('hidden');
   const sel = document.getElementById('task-project');
   sel.innerHTML = state.projects.map(p =>
-    `<option value="${p.id}" ${(state.activeProjectId !== 'all' && state.activeProjectId === p.id) ? 'selected':''}>${esc(p.name)}</option>`
+    `<option value="${p.id}" ${(state.activeProjectId !== 'all' && state.activeProjectId === p.id) ? 'selected' : ''}>${esc(p.name)}</option>`
   ).join('');
   document.getElementById('task-priority').value = 'low';
-  document.getElementById('task-status').value   = 'todo';
+  document.getElementById('task-status').value = 'todo';
   const m = document.getElementById('modal-task');
   m.classList.remove('hidden'); m.classList.add('flex');
   document.getElementById('task-title').focus();
@@ -450,16 +446,16 @@ function openEditTaskModal(id) {
   if (!t) return;
   document.getElementById('modal-task-title').textContent = 'Edit Tracked Task';
   document.getElementById('task-id').value = t.id;
-  document.getElementById('task-title').value   = t.title;
-  document.getElementById('task-desc').value    = t.description || '';
+  document.getElementById('task-title').value = t.title;
+  document.getElementById('task-desc').value = t.description || '';
   document.getElementById('task-deadline').value = t.deadline || '';
   document.getElementById('task-title-error').classList.add('hidden');
   const sel = document.getElementById('task-project');
   sel.innerHTML = state.projects.map(p =>
-    `<option value="${p.id}" ${t.project_id === p.id ? 'selected':''}>${esc(p.name)}</option>`
+    `<option value="${p.id}" ${t.project_id === p.id ? 'selected' : ''}>${esc(p.name)}</option>`
   ).join('');
   document.getElementById('task-priority').value = t.priority;
-  document.getElementById('task-status').value   = t.status;
+  document.getElementById('task-status').value = t.status;
   const m = document.getElementById('modal-task');
   m.classList.remove('hidden'); m.classList.add('flex');
   document.getElementById('task-title').focus();
@@ -471,8 +467,8 @@ function closeTaskModal() {
 
 document.getElementById('btn-cancel-project').addEventListener('click', closeProjectModal);
 document.getElementById('btn-cancel-task').addEventListener('click', closeTaskModal);
-document.getElementById('modal-project').addEventListener('click', e => { if (e.target===e.currentTarget) closeProjectModal(); });
-document.getElementById('modal-task').addEventListener('click', e => { if (e.target===e.currentTarget) closeTaskModal(); });
+document.getElementById('modal-project').addEventListener('click', e => { if (e.target === e.currentTarget) closeProjectModal(); });
+document.getElementById('modal-task').addEventListener('click', e => { if (e.target === e.currentTarget) closeTaskModal(); });
 
 document.getElementById('form-project').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -494,16 +490,16 @@ document.getElementById('form-task').addEventListener('submit', async (e) => {
   const id = document.getElementById('task-id').value;
   const title = document.getElementById('task-title').value.trim();
   if (!title) { document.getElementById('task-title-error').classList.remove('hidden'); return; }
-  
+
   const taskData = {
-    projectId:   document.getElementById('task-project').value,
+    projectId: document.getElementById('task-project').value,
     title,
     description: document.getElementById('task-desc').value.trim(),
-    deadline:    document.getElementById('task-deadline').value,
-    priority:    document.getElementById('task-priority').value,
-    status:      document.getElementById('task-status').value,
+    deadline: document.getElementById('task-deadline').value,
+    priority: document.getElementById('task-priority').value,
+    status: document.getElementById('task-status').value,
   };
-  
+
   try {
     if (id) {
       await apiFullUpdateTask(id, taskData);
@@ -518,7 +514,7 @@ document.getElementById('form-task').addEventListener('submit', async (e) => {
 function render() {
   renderHeader();
   renderTabNav();
-  if (state.activeTab === 'board')     renderKanbanBoard();
+  if (state.activeTab === 'board') renderKanbanBoard();
   if (state.activeTab === 'deadlines') renderDeadlines();
 }
 
