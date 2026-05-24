@@ -39,37 +39,14 @@ $method = $_SERVER['REQUEST_METHOD'];
 // ─────────────────────────────────────────────────────────────
 function sanitizeInput($data) {
     if (is_array($data)) {
-        foreach ($data as $key => $value) {
-            $data[$key] = sanitizeInput($value);
+        foreach ($data as $field => $value) {
+            $data[$field] = sanitizeInput($value);
         }
         return $data;
     }
     return trim(strip_tags((string)$data));
 }
 
-// ─────────────────────────────────────────────────────────────
-// TAG LIST PARSER
-// Takes a comma-separated string of tags, cleans each one,
-// removes duplicates, sorts them, and returns the result
-// as both a rejoined string and an array.
-// ─────────────────────────────────────────────────────────────
-function parseTagList($str) {
-    $tags    = explode(',', $str);
-    $cleaned = [];
-    foreach ($tags as $tag) {
-        $tag = trim(strip_tags($tag));
-        if (!empty($tag)) {
-            $cleaned[] = $tag;
-        }
-    }
-    $cleaned = array_unique($cleaned);
-    sort($cleaned);
-    return [
-        'tags'  => implode(',', $cleaned),
-        'count' => count($cleaned),
-        'list'  => $cleaned,
-    ];
-}
 
 // ─────────────────────────────────────────────────────────────
 // PROJECT VALIDATOR CLASS
@@ -309,8 +286,8 @@ switch ($method) {
 
             if ($user) {
                 // Verify the password by hashing it against the stored salt.
-                $salt = $user['password'];
-                if (crypt($password, $salt) === $salt) {
+                $key = $user['password'];
+                if (crypt($password, $key) === $key) {
                     $_SESSION['user_id']  = $user['id'];
                     $_SESSION['username'] = $user['username'];
                     echo json_encode([
@@ -365,9 +342,9 @@ switch ($method) {
                 exit();
             }
 
-            // Hash the password with a Blowfish salt before storing it.
-            $salt           = '$2y$10$' . bin2hex(random_bytes(11)) . '$';
-            $hashedPassword = crypt($password, $salt);
+            // Hash the password with a Blowfish key before storing it.
+            $key            = '$2y$10$' . bin2hex(random_bytes(11)) . '$';
+            $hashedPassword = crypt($password, $key);
 
             // Insert the new user.
             $id   = uniqid('user_', true);
