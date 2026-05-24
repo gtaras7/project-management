@@ -37,7 +37,7 @@ $method = $_SERVER['REQUEST_METHOD'];
 // applies trim() and strip_tags() to every string it finds.
 // This ensures all incoming data is clean before it's used.
 // ─────────────────────────────────────────────────────────────
-function sanitizeInput($data) {
+function sanitizeInput(mixed $data): mixed {
     if (is_array($data)) {
         foreach ($data as $field => $value) {
             $data[$field] = sanitizeInput($value);
