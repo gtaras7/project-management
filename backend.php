@@ -1,14 +1,12 @@
 <?php
 /**
- * backend.php — REST endpoint for DevBoard Project Tracker with Authentication
- * All responses are JSON. Routes via ?action= query param.
+ * backend.php — REST API endpoint for the DevBoard Project Tracker.
+ * All responses are JSON. Routes are handled via the ?action= query parameter.
  */
 
 // ─────────────────────────────────────────────────────────────
-// SECTION 1: CORS HEADERS
-// Allows the browser to talk to this file from any origin.
-// If the request comes from a known origin, we echo it back;
-// otherwise we just allow everything with a wildcard (*).
+// CORS HEADERS
+// Allows the browser to send requests to this file from any origin.
 // ─────────────────────────────────────────────────────────────
 if (isset($_SERVER['HTTP_ORIGIN'])) {
     header('Access-Control-Allow-Origin: ' . $_SERVER['HTTP_ORIGIN']);
@@ -20,18 +18,11 @@ header('Content-Type: application/json; charset=UTF-8');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
 
-// ─────────────────────────────────────────────────────────────
-// SECTION 2: PREFLIGHT CHECK
-// Browsers send an OPTIONS request before the real request
-// to check if CORS is allowed. We just say 200 OK and stop.
-// ─────────────────────────────────────────────────────────────
+// Handle preflight OPTIONS request sent by the browser before the actual request.
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit(); }
 
 // ─────────────────────────────────────────────────────────────
-// SECTION 3: SESSION + DB + ROUTING SETUP
-// Start the user session so we can track who is logged in.
-// Connect to the database, grab the action from the URL (?action=),
-// and figure out if it's a GET or POST request.
+// SESSION + DB + ROUTING SETUP
 // ─────────────────────────────────────────────────────────────
 session_start();
 
@@ -41,10 +32,156 @@ $db     = DatabaseConnection::getConnection();
 $method = $_SERVER['REQUEST_METHOD'];
 
 // ─────────────────────────────────────────────────────────────
-// SECTION 4: AUTH HELPER
-// This function is called on any route that needs a logged-in user.
-// If there's no session, it sends back a 401 Unauthorized error
-// and stops the script. Otherwise it returns the user's ID.
+// RECURSIVE INPUT SANITIZER
+// Walks through any value — or any nested array of values — and
+// applies trim() and strip_tags() to every string it finds.
+// This ensures all incoming data is clean before it's used.
+// ─────────────────────────────────────────────────────────────
+function sanitizeInput($data) {
+    if (is_array($data)) {
+        foreach ($data as $key => $value) {
+            $data[$key] = sanitizeInput($value);
+        }
+        return $data;
+    }
+    return trim(strip_tags((string)$data));
+}
+
+// ─────────────────────────────────────────────────────────────
+// TAG LIST PARSER
+// Takes a comma-separated string of tags, cleans each one,
+// removes duplicates, sorts them, and returns the result
+// as both a rejoined string and an array.
+// ─────────────────────────────────────────────────────────────
+function parseTagList($str) {
+    $tags    = explode(',', $str);
+    $cleaned = [];
+    foreach ($tags as $tag) {
+        $tag = trim(strip_tags($tag));
+        if (!empty($tag)) {
+            $cleaned[] = $tag;
+        }
+    }
+    $cleaned = array_unique($cleaned);
+    sort($cleaned);
+    return [
+        'tags'  => implode(',', $cleaned),
+        'count' => count($cleaned),
+        'list'  => $cleaned,
+    ];
+}
+
+// ─────────────────────────────────────────────────────────────
+// PROJECT VALIDATOR CLASS
+// Validates and cleans fields for projects and tasks.
+// The constructor accepts the raw data array and a mode
+// ('project' or 'task') and runs all validation up front.
+// Use the getter methods to retrieve the cleaned values.
+// ─────────────────────────────────────────────────────────────
+class ProjectValidator {
+
+    // Private properties — only accessible through the getter methods.
+    private string  $name        = '';
+    private string  $description = '';
+    private string  $status      = '';
+    private string  $priority    = '';
+    private ?string $deadline    = null;
+    private bool    $isValid     = false;
+    private string  $errorMsg    = '';
+
+    // Lists of accepted values for status and priority.
+    private array $allowedStatuses   = ['todo', 'in_progress', 'review', 'done'];
+    private array $allowedPriorities = ['low', 'medium', 'high'];
+
+    // Constructor — validates all fields immediately on instantiation.
+    public function __construct(array $data, string $mode = 'project') {
+
+        // Validate the name field — required for both projects and tasks.
+        $name = trim(strip_tags($data['name'] ?? ''));
+        if (empty($name)) {
+            $this->errorMsg = "Field 'name' is required.";
+            return;
+        }
+        $this->name = $name;
+
+        // Clean the optional description field.
+        $this->description = trim(strip_tags($data['description'] ?? ''));
+
+        // Task-specific field validation.
+        if ($mode === 'task') {
+
+            // Validate status against the allowed list.
+            $status = $data['status'] ?? 'todo';
+            if (!in_array($status, $this->allowedStatuses)) {
+                $this->errorMsg = "Invalid status value. Allowed: " .
+                    implode(', ', $this->allowedStatuses);
+                return;
+            }
+            $this->status = $status;
+
+            // Validate priority against the allowed list.
+            $priority = $data['priority'] ?? 'low';
+            if (!in_array($priority, $this->allowedPriorities)) {
+                $this->errorMsg = "Invalid priority value. Allowed: " .
+                    implode(', ', $this->allowedPriorities);
+                return;
+            }
+            $this->priority = $priority;
+
+            // Validate the deadline date if one was provided.
+            if (!empty($data['deadline'])) {
+                $deadlineStr = trim($data['deadline']);
+
+                // Split the date string (YYYY-MM-DD) into its parts.
+                $dateParts = explode('-', $deadlineStr);
+
+                // Make sure the string split into exactly 3 parts.
+                if (count($dateParts) !== 3) {
+                    $this->errorMsg = "Invalid deadline format. Expected YYYY-MM-DD.";
+                    return;
+                }
+
+                $year  = (int)$dateParts[0];
+                $month = (int)$dateParts[1];
+                $day   = (int)$dateParts[2];
+
+                // Check that the date is a real calendar date.
+                if (!checkdate($month, $day, $year)) {
+                    $this->errorMsg = "Invalid deadline date. Please enter a real calendar date.";
+                    return;
+                }
+
+                // Check that the deadline is not in the past.
+                $deadlineTs = strtotime($deadlineStr);
+                $todayTs    = strtotime('today');
+
+                if ($deadlineTs < $todayTs) {
+                    $this->errorMsg = "Deadline must be today or a future date.";
+                    return;
+                }
+
+                $this->deadline = $deadlineStr;
+            }
+        }
+
+        // All checks passed.
+        $this->isValid = true;
+    }
+
+    // Getter methods — return the validated private field values.
+    public function isValid(): bool        { return $this->isValid; }
+    public function getError(): string     { return $this->errorMsg; }
+    public function getName(): string      { return $this->name; }
+    public function getDesc(): string      { return $this->description; }
+    public function getStatus(): string    { return $this->status; }
+    public function getPriority(): string  { return $this->priority; }
+    public function getDeadline(): ?string { return $this->deadline; }
+}
+
+// ─────────────────────────────────────────────────────────────
+// AUTH HELPER
+// Checks that the user is logged in before allowing access to
+// protected routes. Sends a 401 and stops the script if not.
 // ─────────────────────────────────────────────────────────────
 function requireAuth() {
     if (!isset($_SESSION['user_id'])) {
@@ -56,8 +193,8 @@ function requireAuth() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// SECTION 5: MAIN ROUTER
-// Splits the logic depending on the HTTP method (GET or POST).
+// MAIN ROUTER
+// Dispatches the request based on the HTTP method (GET / POST).
 // ─────────────────────────────────────────────────────────────
 switch ($method) {
 
@@ -66,15 +203,15 @@ switch ($method) {
     // ─────────────────────────────────────────────────────────
     case 'GET':
 
-        // check_session — public route, no login needed.
+        // check_session — public route, no login required.
         // Returns whether the user is currently logged in.
         if ($action === 'check_session') {
             if (isset($_SESSION['user_id'])) {
                 echo json_encode([
                     'logged_in' => true,
                     'user' => [
-                        'id' => $_SESSION['user_id'],
-                        'username' => $_SESSION['username']
+                        'id'       => $_SESSION['user_id'],
+                        'username' => htmlspecialchars($_SESSION['username'])
                     ]
                 ]);
             } else {
@@ -83,28 +220,53 @@ switch ($method) {
             exit();
         }
 
-        // All other GET routes require the user to be logged in.
+        // All other GET routes require a logged-in user.
         $userId = requireAuth();
 
-        // projects — fetch all projects that belong to this user,
-        // newest first.
+        // projects — returns all projects belonging to this user, newest first.
         if ($action === 'projects') {
             $stmt = $db->prepare('SELECT * FROM `projects` WHERE user_id = :user_id ORDER BY created_at DESC');
             $stmt->execute([':user_id' => $userId]);
-            echo json_encode($stmt->fetchAll());
 
-        // tasks — fetch all tasks that belong to this user's projects,
-        // sorted by deadline (soonest first), then newest first.
+            $projects     = $stmt->fetchAll();
+            $safeProjects = [];
+            foreach ($projects as $project) {
+                $safeProjects[] = [
+                    'id'          => $project['id'],
+                    'user_id'     => $project['user_id'],
+                    'name'        => htmlspecialchars($project['name']),
+                    'description' => htmlspecialchars($project['description'] ?? ''),
+                    'created_at'  => $project['created_at'],
+                ];
+            }
+            echo json_encode($safeProjects);
+
+        // tasks — returns all tasks in this user's projects,
+        // ordered by deadline (soonest first), then creation date.
         } elseif ($action === 'tasks') {
             $stmt = $db->prepare('SELECT t.* FROM `tasks` t 
                                   INNER JOIN `projects` p ON t.project_id = p.id 
                                   WHERE p.user_id = :user_id 
                                   ORDER BY t.deadline ASC, t.created_at DESC');
             $stmt->execute([':user_id' => $userId]);
-            echo json_encode($stmt->fetchAll());
+
+            $tasks     = $stmt->fetchAll();
+            $safeTasks = [];
+            foreach ($tasks as $task) {
+                $safeTasks[] = [
+                    'id'          => $task['id'],
+                    'project_id'  => $task['project_id'],
+                    'title'       => htmlspecialchars($task['title']),
+                    'description' => htmlspecialchars($task['description'] ?? ''),
+                    'status'      => $task['status'],
+                    'priority'    => $task['priority'],
+                    'deadline'    => $task['deadline'],
+                    'created_at'  => $task['created_at'],
+                ];
+            }
+            echo json_encode($safeTasks);
 
         } else {
-            // Unknown action — send back a 400 error.
             http_response_code(400);
             echo json_encode(['error' => 'Unknown GET action.']);
         }
@@ -114,21 +276,30 @@ switch ($method) {
     // POST REQUESTS
     // ─────────────────────────────────────────────────────────
     case 'POST':
-        // Read the JSON body the frontend sent us.
-        $data = json_decode(file_get_contents('php://input'), true) ?? [];
+        // Read and decode the JSON body sent by the frontend.
+        $rawData = json_decode(file_get_contents('php://input'), true) ?? [];
+
+        // Run all string values in the input through the sanitizer.
+        // Password is kept from rawData to avoid stripping special characters.
+        $data = sanitizeInput($rawData);
 
         // ── LOGIN ──────────────────────────────────────────────
-        // Validates the username/password, checks the DB,
-        // and starts a session if credentials are correct.
+        // Checks the submitted credentials against the database.
+        // Uses crypt() to compare the password against the stored hash.
         if ($action === 'login') {
+
             $username = trim($data['username'] ?? '');
-            $password = $data['password'] ?? '';
+            $password = $rawData['password'] ?? '';
 
             if (empty($username)) {
-                http_response_code(400); echo json_encode(['error' => 'Username is required.']); exit();
+                http_response_code(400);
+                echo json_encode(['error' => 'Username is required.']);
+                exit();
             }
             if (empty($password)) {
-                http_response_code(400); echo json_encode(['error' => 'Password is required.']); exit();
+                http_response_code(400);
+                echo json_encode(['error' => 'Password is required.']);
+                exit();
             }
 
             // Look up the user by username.
@@ -137,17 +308,16 @@ switch ($method) {
             $user = $stmt->fetch();
 
             if ($user) {
-                // Use crypt() to verify the password against the stored hash.
+                // Verify the password by hashing it against the stored salt.
                 $salt = $user['password'];
                 if (crypt($password, $salt) === $salt) {
-                    // Correct password — save user info to session.
-                    $_SESSION['user_id'] = $user['id'];
+                    $_SESSION['user_id']  = $user['id'];
                     $_SESSION['username'] = $user['username'];
                     echo json_encode([
                         'status' => 'logged_in',
-                        'user' => [
-                            'id' => $user['id'],
-                            'username' => $user['username']
+                        'user'   => [
+                            'id'       => $user['id'],
+                            'username' => htmlspecialchars($user['username'])
                         ]
                     ]);
                 } else {
@@ -161,244 +331,323 @@ switch ($method) {
             exit();
 
         // ── REGISTER ───────────────────────────────────────────
-        // Validates new user input, checks for duplicate accounts,
-        // hashes the password, saves to DB, then auto-logs them in.
+        // Validates the new user's fields, checks for duplicates,
+        // hashes the password, inserts the record, and auto-logs them in.
         } elseif ($action === 'register') {
-            $username = trim(strip_tags($data['username'] ?? ''));
-            $email = trim(strip_tags($data['email'] ?? ''));
-            $password = $data['password'] ?? '';
 
-            // Basic validation checks.
+            $username = trim($data['username'] ?? '');
+            $email    = trim($data['email'] ?? '');
+            $password = $rawData['password'] ?? '';
+
+            // Validate each required field in sequence.
             if (empty($username)) {
-                http_response_code(400); echo json_encode(['error' => 'Username is required.']); exit();
-            }
-            if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                http_response_code(400); echo json_encode(['error' => 'Valid email is required.']); exit();
+                http_response_code(400);
+                echo json_encode(['error' => 'Username is required.']);
+                exit();
             }
             if (empty($password) || strlen($password) < 6) {
-                http_response_code(400); echo json_encode(['error' => 'Password must be at least 6 characters.']); exit();
+                http_response_code(400);
+                echo json_encode(['error' => 'Password must be at least 6 characters.']);
+                exit();
+            }
+            if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Valid email is required.']);
+                exit();
             }
 
-            // Make sure the username or email isn't already taken.
+            // Check that the username and email are not already in use.
             $stmt = $db->prepare('SELECT COUNT(*) FROM `users` WHERE username = :username OR email = :email');
             $stmt->execute([':username' => $username, ':email' => $email]);
-            if ($stmt->fetchColumn() > 0) {
+            if ((int)$stmt->fetchColumn() > 0) {
                 http_response_code(400);
                 echo json_encode(['error' => 'Username or email already registered.']);
                 exit();
             }
 
-            // Generate a secure random salt and hash the password using Blowfish (bcrypt).
-            $salt = '$2y$10$' . bin2hex(random_bytes(11)) . '$';
+            // Hash the password with a Blowfish salt before storing it.
+            $salt           = '$2y$10$' . bin2hex(random_bytes(11)) . '$';
             $hashedPassword = crypt($password, $salt);
 
-            // Create a unique ID and insert the new user into the DB.
-            $id = uniqid('user_', true);
+            // Insert the new user.
+            $id   = uniqid('user_', true);
             $stmt = $db->prepare('INSERT INTO `users` (id, username, email, password) VALUES (:id, :username, :email, :password)');
             $stmt->execute([':id' => $id, ':username' => $username, ':email' => $email, ':password' => $hashedPassword]);
 
-            // Auto-login: save the new user's info to the session right away.
-            $_SESSION['user_id'] = $id;
+            // Auto-login: save the new user to the session immediately.
+            $_SESSION['user_id']  = $id;
             $_SESSION['username'] = $username;
 
             echo json_encode([
                 'status' => 'registered',
-                'user' => [
-                    'id' => $id,
-                    'username' => $username
+                'user'   => [
+                    'id'       => $id,
+                    'username' => htmlspecialchars($username)
                 ]
             ]);
             exit();
 
         // ── LOGOUT ─────────────────────────────────────────────
-        // Destroys the session, effectively logging the user out.
+        // Destroys the session, logging the user out.
         } elseif ($action === 'logout') {
             session_destroy();
             echo json_encode(['status' => 'logged_out']);
             exit();
         }
 
-        // All other POST routes below require the user to be logged in.
+        // All routes below this point require the user to be logged in.
         $userId = requireAuth();
 
         // ── CREATE PROJECT ─────────────────────────────────────
-        // Inserts a new project row into the DB linked to this user.
+        // Inserts a new project linked to the current user.
         if ($action === 'create_project') {
+
             if (empty($data['name'])) {
-                http_response_code(400); echo json_encode(['error' => "Field 'name' required."]); exit();
+                http_response_code(400);
+                echo json_encode(['error' => "Field 'name' required."]);
+                exit();
             }
+
+            // Validate and clean the fields using the ProjectValidator class.
+            $validator = new ProjectValidator($data, 'project');
+            if (!$validator->isValid()) {
+                http_response_code(400);
+                echo json_encode(['error' => $validator->getError()]);
+                exit();
+            }
+
             $id   = $data['id'] ?? uniqid('proj_', true);
-            $name = trim(strip_tags($data['name']));
-            $desc = trim(strip_tags($data['description'] ?? ''));
+            $name = $validator->getName();
+            $desc = $validator->getDesc();
+
             $db->prepare('INSERT INTO `projects` (id,user_id,name,description) VALUES (:id,:user_id,:name,:description)')
-               ->execute([':id'=>$id,':user_id'=>$userId,':name'=>$name,':description'=>$desc]);
+               ->execute([':id' => $id, ':user_id' => $userId, ':name' => $name, ':description' => $desc]);
             http_response_code(201);
-            echo json_encode(['status'=>'created','id'=>$id]);
+            echo json_encode(['status' => 'created', 'id' => $id]);
 
         // ── CREATE TASK ────────────────────────────────────────
-        // Adds a new task to a project. First checks that the project
-        // actually belongs to this user (ownership check), then validates
-        // the status/priority values before inserting.
+        // Adds a new task to a project after verifying the project
+        // belongs to the current user.
         } elseif ($action === 'create_task') {
+
             if (empty($data['projectId']) || empty($data['title'])) {
-                http_response_code(400); echo json_encode(['error' => "Fields 'projectId' and 'title' required."]); exit();
+                http_response_code(400);
+                echo json_encode(['error' => "Fields 'projectId' and 'title' required."]);
+                exit();
             }
 
-            // Make sure the project belongs to this user before adding a task to it.
+            // Confirm the project belongs to this user before adding a task.
             $checkProj = $db->prepare('SELECT COUNT(*) FROM `projects` WHERE id = :id AND user_id = :user_id');
             $checkProj->execute([':id' => $data['projectId'], ':user_id' => $userId]);
-            if ($checkProj->fetchColumn() == 0) {
-                http_response_code(403); echo json_encode(['error' => 'Forbidden. Not your project.']); exit();
+            if ((int)$checkProj->fetchColumn() === 0) {
+                http_response_code(403);
+                echo json_encode(['error' => 'Forbidden. Not your project.']);
+                exit();
+            }
+
+            // Validate the task fields (status, priority, deadline).
+            $validator = new ProjectValidator($data, 'task');
+            if (!$validator->isValid()) {
+                http_response_code(400);
+                echo json_encode(['error' => $validator->getError()]);
+                exit();
             }
 
             $id       = $data['id'] ?? uniqid('task_', true);
             $title    = trim(strip_tags($data['title']));
-            $desc     = trim(strip_tags($data['description'] ?? ''));
-            $status   = $data['status']   ?? 'todo';
-            $priority = $data['priority'] ?? 'low';
+            $desc     = $validator->getDesc();
+            $status   = $validator->getStatus();
+            $priority = $validator->getPriority();
+            $deadline = $validator->getDeadline();
 
-            // Only allow known status and priority values — reject anything else.
-            $allowed_statuses   = ['todo', 'in_progress', 'review', 'done'];
-            $allowed_priorities = ['low', 'medium', 'high'];
-            if (!in_array($status, $allowed_statuses) || !in_array($priority, $allowed_priorities)) {
-                http_response_code(400);
-                echo json_encode(['error' => 'Invalid status or priority value.']);
-                exit();
-            }
-            $deadline = !empty($data['deadline']) ? $data['deadline'] : null;
             $db->prepare('INSERT INTO `tasks` (id,project_id,title,description,status,priority,deadline)
                           VALUES (:id,:project_id,:title,:description,:status,:priority,:deadline)')
-               ->execute([':id'=>$id,':project_id'=>$data['projectId'],':title'=>$title,
-                          ':description'=>$desc,':status'=>$status,':priority'=>$priority,':deadline'=>$deadline]);
+               ->execute([
+                   ':id'          => $id,
+                   ':project_id'  => $data['projectId'],
+                   ':title'       => $title,
+                   ':description' => $desc,
+                   ':status'      => $status,
+                   ':priority'    => $priority,
+                   ':deadline'    => $deadline,
+               ]);
             http_response_code(201);
-            echo json_encode(['status'=>'created','id'=>$id]);
+            echo json_encode(['status' => 'created', 'id' => $id]);
 
         // ── UPDATE TASK ────────────────────────────────────────
         // Updates one or more fields on an existing task.
-        // Only updates the fields that were actually sent in the request
-        // (builds the SQL dynamically). Ownership is checked first.
+        // Only the fields actually included in the request are changed.
+        // The SET clause is built dynamically from whatever fields were sent.
         } elseif ($action === 'update_task') {
+
             if (empty($data['id'])) {
-                http_response_code(400); echo json_encode(['error' => "Field 'id' required."]); exit();
+                http_response_code(400);
+                echo json_encode(['error' => "Field 'id' required."]);
+                exit();
             }
 
-            // Check that this task belongs to a project owned by this user.
+            // Verify this task belongs to a project owned by the current user.
             $checkTask = $db->prepare('SELECT COUNT(*) FROM `tasks` t 
                                        INNER JOIN `projects` p ON t.project_id = p.id 
                                        WHERE t.id = :id AND p.user_id = :user_id');
             $checkTask->execute([':id' => $data['id'], ':user_id' => $userId]);
-            if ($checkTask->fetchColumn() == 0) {
-                http_response_code(403); echo json_encode(['error' => 'Forbidden. Not your task.']); exit();
+            if ((int)$checkTask->fetchColumn() === 0) {
+                http_response_code(403);
+                echo json_encode(['error' => 'Forbidden. Not your task.']);
+                exit();
             }
 
-            $allowed_statuses = ['todo', 'in_progress', 'review', 'done'];
-            $allowed_priorities = ['low', 'medium', 'high'];
-            
-            // Grab each field from the request if it was provided.
-            $title    = isset($data['title']) ? trim(strip_tags($data['title'])) : null;
+            $allowedStatuses   = ['todo', 'in_progress', 'review', 'done'];
+            $allowedPriorities = ['low', 'medium', 'high'];
+
+            // Only process fields that were included in the request.
+            $title    = isset($data['title'])       ? trim(strip_tags($data['title']))       : null;
             $desc     = isset($data['description']) ? trim(strip_tags($data['description'])) : null;
-            $status   = $data['status'] ?? null;
+            $status   = $data['status']   ?? null;
             $priority = $data['priority'] ?? null;
-            $deadline = !empty($data['deadline']) ? $data['deadline'] : null;
-            
-            // Build the UPDATE query dynamically — only include fields that were sent.
+            $deadline = null;
+
+            // Validate and accept the deadline if one was provided.
+            if (!empty($data['deadline'])) {
+                $deadlineStr = trim($data['deadline']);
+                $dateParts   = explode('-', $deadlineStr);
+                if (count($dateParts) === 3) {
+                    $year  = (int)$dateParts[0];
+                    $month = (int)$dateParts[1];
+                    $day   = (int)$dateParts[2];
+                    if (checkdate($month, $day, $year)) {
+                        $deadline = $deadlineStr;
+                    }
+                }
+            }
+
+            // Build the SET clause dynamically — only include fields that were sent.
             $updates = [];
-            $params = [':id' => $data['id']];
-            
-            if ($title !== null) { $updates[] = 'title=:title'; $params[':title'] = $title; }
-            if ($desc !== null) { $updates[] = 'description=:description'; $params[':description'] = $desc; }
+            $params  = [':id' => $data['id']];
+
+            if ($title !== null)  { $updates[] = 'title=:title';             $params[':title']       = $title; }
+            if ($desc  !== null)  { $updates[] = 'description=:description'; $params[':description'] = $desc; }
+
             if ($status !== null) {
-                if (!in_array($status, $allowed_statuses)) {
-                    http_response_code(400); echo json_encode(['error' => 'Invalid status value.']); exit();
+                if (!in_array($status, $allowedStatuses)) {
+                    http_response_code(400);
+                    echo json_encode(['error' => 'Invalid status. Allowed: ' . implode(', ', $allowedStatuses)]);
+                    exit();
                 }
-                $updates[] = 'status=:status'; $params[':status'] = $status;
+                $updates[] = 'status=:status';
+                $params[':status'] = $status;
             }
+
             if ($priority !== null) {
-                if (!in_array($priority, $allowed_priorities)) {
-                    http_response_code(400); echo json_encode(['error' => 'Invalid priority value.']); exit();
+                if (!in_array($priority, $allowedPriorities)) {
+                    http_response_code(400);
+                    echo json_encode(['error' => 'Invalid priority. Allowed: ' . implode(', ', $allowedPriorities)]);
+                    exit();
                 }
-                $updates[] = 'priority=:priority'; $params[':priority'] = $priority;
+                $updates[] = 'priority=:priority';
+                $params[':priority'] = $priority;
             }
-            if (isset($data['deadline'])) { 
-                $updates[] = 'deadline=:deadline'; $params[':deadline'] = $deadline; 
+
+            if (isset($data['deadline'])) {
+                $updates[] = 'deadline=:deadline';
+                $params[':deadline'] = $deadline;
             }
-            
-            // Run the update only if there's at least one field to change.
-            if (!empty($updates)) {
-                $sql = 'UPDATE `tasks` SET ' . implode(', ', $updates) . ' WHERE id=:id';
+
+            // Run the update only if at least one field was provided.
+            if (count($updates) > 0) {
+                $sql  = 'UPDATE `tasks` SET ' . implode(', ', $updates) . ' WHERE id=:id';
                 $stmt = $db->prepare($sql);
                 $stmt->execute($params);
             }
-            echo json_encode(['status'=>'updated']);
+            echo json_encode(['status' => 'updated']);
 
         // ── DELETE TASK ────────────────────────────────────────
-        // Deletes a task from the DB after verifying the user owns it.
+        // Deletes a task after confirming the current user owns it.
         } elseif ($action === 'delete_task') {
+
             if (empty($data['id'])) {
-                http_response_code(400); echo json_encode(['error' => "Field 'id' required."]); exit();
+                http_response_code(400);
+                echo json_encode(['error' => "Field 'id' required."]);
+                exit();
             }
 
-            // Ownership check — make sure this task belongs to this user.
             $checkTask = $db->prepare('SELECT COUNT(*) FROM `tasks` t 
                                        INNER JOIN `projects` p ON t.project_id = p.id 
                                        WHERE t.id = :id AND p.user_id = :user_id');
             $checkTask->execute([':id' => $data['id'], ':user_id' => $userId]);
-            if ($checkTask->fetchColumn() == 0) {
-                http_response_code(403); echo json_encode(['error' => 'Forbidden. Not your task.']); exit();
+            if ((int)$checkTask->fetchColumn() === 0) {
+                http_response_code(403);
+                echo json_encode(['error' => 'Forbidden. Not your task.']);
+                exit();
             }
 
-            $db->prepare('DELETE FROM `tasks` WHERE id=:id')->execute([':id'=>$data['id']]);
-            echo json_encode(['status'=>'deleted']);
+            $db->prepare('DELETE FROM `tasks` WHERE id=:id')->execute([':id' => $data['id']]);
+            echo json_encode(['status' => 'deleted']);
 
         // ── UPDATE PROJECT ─────────────────────────────────────
-        // Updates the name and description of a project.
-        // Checks ownership before making any changes.
+        // Updates the name and description of an existing project.
         } elseif ($action === 'update_project') {
+
             if (empty($data['id']) || empty($data['name'])) {
-                http_response_code(400); echo json_encode(['error' => "Fields 'id' and 'name' required."]); exit();
+                http_response_code(400);
+                echo json_encode(['error' => "Fields 'id' and 'name' required."]);
+                exit();
             }
 
-            // Make sure this project belongs to the logged-in user.
+            // Confirm the project belongs to this user.
             $checkProj = $db->prepare('SELECT COUNT(*) FROM `projects` WHERE id = :id AND user_id = :user_id');
             $checkProj->execute([':id' => $data['id'], ':user_id' => $userId]);
-            if ($checkProj->fetchColumn() == 0) {
-                http_response_code(403); echo json_encode(['error' => 'Forbidden. Not your project.']); exit();
+            if ((int)$checkProj->fetchColumn() === 0) {
+                http_response_code(403);
+                echo json_encode(['error' => 'Forbidden. Not your project.']);
+                exit();
             }
 
-            $name = trim(strip_tags($data['name']));
-            $desc = trim(strip_tags($data['description'] ?? ''));
+            $validator = new ProjectValidator($data, 'project');
+            if (!$validator->isValid()) {
+                http_response_code(400);
+                echo json_encode(['error' => $validator->getError()]);
+                exit();
+            }
+
+            $name = $validator->getName();
+            $desc = $validator->getDesc();
+
             $db->prepare('UPDATE `projects` SET name=:name, description=:description WHERE id=:id')
-               ->execute([':id'=>$data['id'], ':name'=>$name, ':description'=>$desc]);
-            echo json_encode(['status'=>'updated']);
+               ->execute([':id' => $data['id'], ':name' => $name, ':description' => $desc]);
+            echo json_encode(['status' => 'updated']);
 
         // ── DELETE PROJECT ─────────────────────────────────────
-        // Deletes a project from the DB after verifying ownership.
-        // (Tasks linked to this project will also be removed via DB cascade.)
+        // Deletes a project after confirming ownership.
+        // Tasks under this project are removed automatically via the
+        // ON DELETE CASCADE constraint defined in the schema.
         } elseif ($action === 'delete_project') {
+
             if (empty($data['id'])) {
-                http_response_code(400); echo json_encode(['error' => "Field 'id' required."]); exit();
+                http_response_code(400);
+                echo json_encode(['error' => "Field 'id' required."]);
+                exit();
             }
 
-            // Make sure this project belongs to the logged-in user.
             $checkProj = $db->prepare('SELECT COUNT(*) FROM `projects` WHERE id = :id AND user_id = :user_id');
             $checkProj->execute([':id' => $data['id'], ':user_id' => $userId]);
-            if ($checkProj->fetchColumn() == 0) {
-                http_response_code(403); echo json_encode(['error' => 'Forbidden. Not your project.']); exit();
+            if ((int)$checkProj->fetchColumn() === 0) {
+                http_response_code(403);
+                echo json_encode(['error' => 'Forbidden. Not your project.']);
+                exit();
             }
 
-            $db->prepare('DELETE FROM `projects` WHERE id=:id')->execute([':id'=>$data['id']]);
-            echo json_encode(['status'=>'deleted']);
+            $db->prepare('DELETE FROM `projects` WHERE id=:id')->execute([':id' => $data['id']]);
+            echo json_encode(['status' => 'deleted']);
 
         } else {
-            // Unknown POST action — send back a 400 error.
-            http_response_code(400); echo json_encode(['error' => 'Unknown POST action.']);
+            http_response_code(400);
+            echo json_encode(['error' => 'Unknown POST action.']);
         }
         break;
 
-    // ─────────────────────────────────────────────────────────
-    // CATCH-ALL: Any other HTTP method (PUT, DELETE, etc.)
-    // is not supported — respond with 405 Method Not Allowed.
-    // ─────────────────────────────────────────────────────────
+    // Any other HTTP method (PUT, PATCH, DELETE, etc.) is not supported.
     default:
-        http_response_code(405); echo json_encode(['error' => 'Method not allowed.']);
+        http_response_code(405);
+        echo json_encode(['error' => 'Method not allowed.']);
 }
