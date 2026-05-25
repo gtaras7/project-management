@@ -17,7 +17,7 @@ const state = {
 };
 
 // The base URL for all backend requests.
-const API = 'backend.php';
+const BACKEND_URL = 'backend.php';
 
 // ─────────────────────────────────────────────────────────────
 // SECTION 2: API HELPERS
@@ -25,12 +25,12 @@ const API = 'backend.php';
 // requests, parsing the JSON response, and catching errors.
 // ─────────────────────────────────────────────────────────────
 
-// apiFetch — the core request function.
+// request — the core request function.
 // If a body is passed it sends a POST with JSON, otherwise a GET.
 // Includes session cookies so PHP knows who's logged in.
 // If the server says 401 (not logged in), it shows the login modal.
-async function apiFetch(action, body = null) {
-  const url  = `${API}?action=${action}`;
+async function request(action, body = null) {
+  const url  = `${BACKEND_URL}?action=${action}`;
   const opts = {
     method: body ? 'POST' : 'GET',
     headers: body ? { 'Content-Type': 'application/json' } : {},
@@ -54,24 +54,24 @@ async function apiFetch(action, body = null) {
 // loadData — fetches all projects and tasks for the logged-in user
 // at once and stores them in state.
 async function loadData() {
-  const [projects, tasks] = await Promise.all([apiFetch('projects'), apiFetch('tasks')]);
+  const [projects, tasks] = await Promise.all([request('projects'), request('tasks')]);
   state.projects = projects;
   state.tasks    = tasks;
 }
 
-// apiCreateProject — sends a new project to the backend,
+// createProject — sends a new project to the backend,
 // then immediately adds it to state so the UI updates without a reload.
-async function apiCreateProject(name, description) {
+async function createProject(name, description) {
   const id = `proj-${Date.now()}`;
-  await apiFetch('create_project', { id, name, description });
+  await request('create_project', { id, name, description });
   state.projects.push({ id, name, description, created_at: new Date().toISOString() });
 }
 
-// apiCreateTask — sends a new task to the backend,
+// createTask — sends a new task to the backend,
 // then pushes it into state.tasks right away.
-async function apiCreateTask(taskData) {
+async function createTask(taskData) {
   const id = `task-${Date.now()}`;
-  await apiFetch('create_task', { id, ...taskData });
+  await request('create_task', { id, ...taskData });
   state.tasks.push({
     id,
     project_id:  taskData.projectId,
@@ -84,18 +84,18 @@ async function apiCreateTask(taskData) {
   });
 }
 
-// apiUpdateTask — moves a task to a new status column (e.g. todo → in_progress).
+// updateTask — moves a task to a new status column (e.g. todo → in_progress).
 // Updates the backend and the local state copy.
-async function apiUpdateTask(id, status) {
-  await apiFetch('update_task', { id, status });
+async function updateTask(id, status) {
+  await request('update_task', { id, status });
   const t = state.tasks.find(t => t.id === id);
   if (t) t.status = status;
 }
 
-// apiFullUpdateTask — saves all editable fields of a task (used by the Edit form).
+// fullUpdateTask — saves all editable fields of a task (used by the Edit form).
 // Updates the backend and patches the matching task in state.
-async function apiFullUpdateTask(id, taskData) {
-  await apiFetch('update_task', { id, ...taskData });
+async function fullUpdateTask(id, taskData) {
+  await request('update_task', { id, ...taskData });
   const t = state.tasks.find(t => t.id === id);
   if (t) {
     t.title = taskData.title;
@@ -107,16 +107,16 @@ async function apiFullUpdateTask(id, taskData) {
   }
 }
 
-// apiDeleteTask — deletes a task from the backend and removes it from state.
-async function apiDeleteTask(id) {
-  await apiFetch('delete_task', { id });
+// deleteTask — deletes a task from the backend and removes it from state.
+async function deleteTask(id) {
+  await request('delete_task', { id });
   state.tasks = state.tasks.filter(t => t.id !== id);
 }
 
-// apiUpdateProject — saves an edited project name/description to the backend
+// updateProject — saves an edited project name/description to the backend
 // and updates the local state copy.
-async function apiUpdateProject(id, name, description) {
-  await apiFetch('update_project', { id, name, description });
+async function updateProject(id, name, description) {
+  await request('update_project', { id, name, description });
   const p = state.projects.find(p => p.id === id);
   if (p) {
     p.name = name;
@@ -124,10 +124,10 @@ async function apiUpdateProject(id, name, description) {
   }
 }
 
-// apiDeleteProject — deletes a project and all its tasks from the backend.
+// deleteProject — deletes a project and all its tasks from the backend.
 // Also cleans them out of state, and resets the active project tab to "All".
-async function apiDeleteProject(id) {
-  await apiFetch('delete_project', { id });
+async function deleteProject(id) {
+  await request('delete_project', { id });
   state.projects = state.projects.filter(p => p.id !== id);
   state.tasks = state.tasks.filter(t => t.project_id !== id);
   if (state.activeProjectId === id) state.activeProjectId = 'all';
@@ -399,7 +399,7 @@ function renderKanbanBoard() {
   // Move arrow buttons — update the task status and re-render.
   document.querySelectorAll('[data-action="move"]').forEach(btn =>
     btn.addEventListener('click', async () => {
-      try { await apiUpdateTask(btn.dataset.id, btn.dataset.target); render(); }
+      try { await updateTask(btn.dataset.id, btn.dataset.target); render(); }
       catch (e) { alert('Failed to update: ' + e.message); }
     })
   );
@@ -408,7 +408,7 @@ function renderKanbanBoard() {
   document.querySelectorAll('[data-action="delete"]').forEach(btn =>
     btn.addEventListener('click', async () => {
       if (!confirm('Delete this task?')) return;
-      try { await apiDeleteTask(btn.dataset.id); render(); }
+      try { await deleteTask(btn.dataset.id); render(); }
       catch (e) { alert('Failed to delete: ' + e.message); }
     })
   );
@@ -427,7 +427,7 @@ function renderKanbanBoard() {
   document.querySelectorAll('[data-action="delete-project"]').forEach(btn =>
     btn.addEventListener('click', async () => {
       if (!confirm('Delete this project and all its tasks? This cannot be undone.')) return;
-      try { await apiDeleteProject(btn.dataset.id); render(); }
+      try { await deleteProject(btn.dataset.id); render(); }
       catch (e) { alert('Failed to delete project: ' + e.message); }
     })
   );
@@ -635,9 +635,9 @@ document.getElementById('form-project').addEventListener('submit', async (e) => 
   if (!name) { document.getElementById('proj-name-error').classList.remove('hidden'); return; }
   try {
     if (id) {
-      await apiUpdateProject(id, name, document.getElementById('proj-desc').value.trim());
+      await updateProject(id, name, document.getElementById('proj-desc').value.trim());
     } else {
-      await apiCreateProject(name, document.getElementById('proj-desc').value.trim());
+      await createProject(name, document.getElementById('proj-desc').value.trim());
     }
     closeProjectModal(); render();
   } catch (err) { alert('Failed to save project: ' + err.message); }
@@ -663,9 +663,9 @@ document.getElementById('form-task').addEventListener('submit', async (e) => {
   
   try {
     if (id) {
-      await apiFullUpdateTask(id, taskData);
+      await fullUpdateTask(id, taskData);
     } else {
-      await apiCreateTask(taskData);
+      await createTask(taskData);
     }
     closeTaskModal(); render();
   } catch (err) { alert('Failed to save task: ' + err.message); }
@@ -758,9 +758,9 @@ function bindAuthEvents() {
     try {
       let res;
       if (state.authMode === 'login') {
-        res = await apiFetch('login', { username, password });
+        res = await request('login', { username, password });
       } else {
-        res = await apiFetch('register', { username, email, password });
+        res = await request('register', { username, email, password });
       }
 
       state.user = res.user;
@@ -782,7 +782,7 @@ function bindAuthEvents() {
 async function handleLogout() {
   if (!confirm('Are you sure you want to sign out?')) return;
   try {
-    await apiFetch('logout', {});
+    await request('logout', {});
     state.user = null;
     state.projects = [];
     state.tasks = [];
@@ -818,7 +818,7 @@ function render() {
 // If no: shows the login modal.
 async function init() {
   try {
-    const session = await apiFetch('check_session');
+    const session = await request('check_session');
     if (session.logged_in) {
       state.user = session.user;
       await loadData();
@@ -828,7 +828,7 @@ async function init() {
       return;
     }
   } catch (e) {
-    // If not logged in, apiFetch triggers 401 and calls showAuthModal.
+    // If not logged in, request() triggers 401 and calls showAuthModal.
     bindAuthEvents();
     return;
   }
