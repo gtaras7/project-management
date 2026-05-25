@@ -423,7 +423,8 @@ switch ($method) {
             }
 
             // Validate the task fields (status, priority, deadline).
-            $validator = new ProjectValidator($data, 'task');
+            // ProjectValidator expects 'name', but tasks use 'title' — bridge the difference.
+            $validator = new ProjectValidator(array_merge($data, ['name' => $data['title'] ?? '']), 'task');
             if (!$validator->isValid()) {
                 http_response_code(400);
                 echo json_encode(['error' => $validator->getError()]);
