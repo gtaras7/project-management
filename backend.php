@@ -26,6 +26,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit();
 // ─────────────────────────────────────────────────────────────
 session_start();
 
+// Secret used to sign remember-me cookie tokens — change this in production.
+define('REMEMBER_ME_SECRET', 'cs325_devboard_secret_2024');
+define('REMEMBER_ME_COOKIE', 'remember_me');
+define('REMEMBER_ME_DAYS', 30);
+
 require_once 'db_connect.php';
 $action = $_GET['action'] ?? '';
 $db     = DatabaseConnection::getConnection();
@@ -183,6 +188,7 @@ switch ($method) {
         // check_session — public route, no login required.
         // Returns whether the user is currently logged in.
         if ($action === 'check_session') {
+            // First check for an active PHP session.
             if (isset($_SESSION['user_id'])) {
                 echo json_encode([
                     'logged_in' => true,
@@ -191,9 +197,40 @@ switch ($method) {
                         'username' => htmlspecialchars($_SESSION['username'])
                     ]
                 ]);
-            } else {
-                echo json_encode(['logged_in' => false]);
+                exit();
             }
+
+            // No session — check for a remember-me cookie and restore if valid.
+            if (isset($_COOKIE[REMEMBER_ME_COOKIE])) {
+                $cookieVal = $_COOKIE[REMEMBER_ME_COOKIE];
+                $parts     = explode(':', $cookieVal, 2);
+                if (count($parts) === 2) {
+                    [$userId, $token] = $parts;
+                    $expected = hash_hmac('sha256', $userId, REMEMBER_ME_SECRET);
+                    if (hash_equals($expected, $token)) {
+                        // Token is valid — look up the user and restore session.
+                        $stmt = $db->prepare('SELECT id, username FROM `users` WHERE id = :id');
+                        $stmt->execute([':id' => $userId]);
+                        $user = $stmt->fetch();
+                        if ($user) {
+                            $_SESSION['user_id']  = $user['id'];
+                            $_SESSION['username'] = $user['username'];
+                            echo json_encode([
+                                'logged_in' => true,
+                                'user' => [
+                                    'id'       => $user['id'],
+                                    'username' => htmlspecialchars($user['username'])
+                                ]
+                            ]);
+                            exit();
+                        }
+                    }
+                }
+                // Cookie is invalid — clear it.
+                setcookie(REMEMBER_ME_COOKIE, '', time() - 3600, '/', '', false, true);
+            }
+
+            echo json_encode(['logged_in' => false]);
             exit();
         }
 
@@ -290,6 +327,14 @@ switch ($method) {
                 if (crypt($password, $key) === $key) {
                     $_SESSION['user_id']  = $user['id'];
                     $_SESSION['username'] = $user['username'];
+
+                    // Set a persistent remember-me cookie if the user opted in.
+                    if (!empty($data['remember_me'])) {
+                        $token  = hash_hmac('sha256', $user['id'], REMEMBER_ME_SECRET);
+                        $expiry = time() + (REMEMBER_ME_DAYS * 24 * 60 * 60);
+                        setcookie(REMEMBER_ME_COOKIE, $user['id'] . ':' . $token, $expiry, '/', '', false, true);
+                    }
+
                     echo json_encode([
                         'status' => 'logged_in',
                         'user'   => [
@@ -368,6 +413,8 @@ switch ($method) {
         // Destroys the session, logging the user out.
         } elseif ($action === 'logout') {
             session_destroy();
+            // Clear the remember-me cookie on explicit logout.
+            setcookie(REMEMBER_ME_COOKIE, '', time() - 3600, '/', '', false, true);
             echo json_encode(['status' => 'logged_out']);
             exit();
         }

@@ -704,23 +704,27 @@ function updateAuthFormUI() {
   const tabLogin = document.getElementById('tab-btn-login');
   const tabRegister = document.getElementById('tab-btn-register');
 
+  const rememberGroup = document.getElementById('auth-remember-group');
+
   if (state.authMode === 'login') {
-    // Login mode — hide the email field, update text.
+    // Login mode — hide the email field, show remember-me, update text.
     title.textContent = 'Sign In';
     subtitle.textContent = 'Access your Project Tracker board';
     submitBtn.textContent = 'Sign In';
     emailGroup.classList.add('hidden');
     emailInput.removeAttribute('required');
+    rememberGroup?.classList.remove('hidden');
 
     tabLogin.className = "flex-1 text-xs font-bold py-1.5 rounded-md bg-white text-slate-900 shadow-sm transition-all focus:outline-none";
     tabRegister.className = "flex-1 text-xs font-bold py-1.5 rounded-md text-slate-500 hover:text-slate-900 transition-all focus:outline-none";
   } else {
-    // Register mode — show the email field, update text.
+    // Register mode — show the email field, hide remember-me, update text.
     title.textContent = 'Create Account';
     subtitle.textContent = 'Start tracking your course milestones';
     submitBtn.textContent = 'Register Now';
     emailGroup.classList.remove('hidden');
     emailInput.setAttribute('required', 'true');
+    rememberGroup?.classList.add('hidden');
 
     tabRegister.className = "flex-1 text-xs font-bold py-1.5 rounded-md bg-white text-slate-900 shadow-sm transition-all focus:outline-none";
     tabLogin.className = "flex-1 text-xs font-bold py-1.5 rounded-md text-slate-500 hover:text-slate-900 transition-all focus:outline-none";
@@ -751,6 +755,7 @@ function bindAuthEvents() {
     const username = document.getElementById('auth-username').value.trim();
     const password = document.getElementById('auth-password').value;
     const email = document.getElementById('auth-email').value.trim();
+    const rememberMe = document.getElementById('auth-remember')?.checked ?? false;
     const errDiv = document.getElementById('auth-error');
 
     errDiv.classList.add('hidden');
@@ -758,7 +763,7 @@ function bindAuthEvents() {
     try {
       let res;
       if (state.authMode === 'login') {
-        res = await request('login', { username, password });
+        res = await request('login', { username, password, remember_me: rememberMe });
       } else {
         res = await request('register', { username, email, password });
       }

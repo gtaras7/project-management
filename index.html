@@ -97,6 +97,13 @@
             class="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-[#3BBDE5]/20 focus:border-[#3BBDE5]" />
         </div>
 
+        <!-- Remember Me — only shown in Login mode, hidden by app.js in Register mode -->
+        <div id="auth-remember-group" class="flex items-center gap-2">
+          <input id="auth-remember" type="checkbox"
+            class="w-3.5 h-3.5 accent-[#2E7D9B] cursor-pointer rounded" />
+          <label for="auth-remember" class="text-[11px] text-slate-500 cursor-pointer select-none">Remember me for 30 days</label>
+        </div>
+
         <!-- Submit button — label updated by app.js based on Login or Register mode -->
         <button type="submit" id="btn-auth-submit"
           class="w-full py-2.5 text-xs font-extrabold text-white bg-[#2E7D9B] hover:bg-[#3BBDE5] rounded-lg shadow-md transition-all">Sign In</button>
